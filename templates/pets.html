@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrepPi — Pets</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="header">
+    <div class="brand">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="PrepPi logo">
+        </div>
+        <div>
+            <h1>PrepPi</h1>
+            <p class="subtitle">HOUSEHOLD PETS</p>
+        </div>
+    </div>
+    <div class="header-note">
+        <a class="settings-link" href="{{ url_for('dashboard') }}">← Dashboard</a>
+        <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="settings-link">Log out</button>
+        </form>
+    </div>
+</header>
+
+<main>
+    <section class="intro">
+        <div>
+            <p class="eyebrow">HOUSEHOLD PREPAREDNESS</p>
+            <h2>Your pets.</h2>
+            <p class="muted">Record the animals in your household and their daily food requirements.</p>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">PET PROFILES</p>
+                <h2>Who we're preparing for</h2>
+            </div>
+            <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                <span class="count">{{ pets|length }} recorded</span>
+                <a class="settings-link" href="{{ url_for('add_pet') }}">+ Add pet</a>
+            </div>
+        </div>
+
+        {% if pets %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Species</th>
+                        <th>Daily food allowance</th>
+                        <th>14-day requirement</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pet in pets %}
+                    <tr>
+                        <td class="item-name">{{ pet.name }}</td>
+                        <td>{{ pet.species|capitalize }}</td>
+                        <td>{{ pet.daily_food_grams|round(1) }} g</td>
+                        <td>{{ (pet.daily_food_grams * 14)|round(0)|int }} g</td>
+                        <td>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <a class="secondary-link"
+                                   href="{{ url_for('edit_pet', pet_id=pet.id) }}">Edit</a>
+                                <form method="post"
+                                      action="{{ url_for('delete_pet', pet_id=pet.id) }}"
+                                      onsubmit="return confirm('Delete {{ pet.name|e }} from your pet profiles?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="secondary-link">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="muted" style="padding: 0 22px 22px;">
+            No pets have been added yet. Add each cat or dog and their daily food allowance
+            to include them in your household preparedness calculations.
+        </p>
+        {% endif %}
+    </section>
+</main>
+</body>
+</html>

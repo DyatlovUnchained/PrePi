@@ -1,0 +1,10 @@
+[Unit]
+Description=Run PrepPi daily stock expiry check
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+Persistent=true
+Unit=preppi-expiry-alerts.service
+
+[Install]
+WantedBy=timers.target

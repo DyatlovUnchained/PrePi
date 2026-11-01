@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Gmail for PrepPi stock updates every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=preppi-email-receiver.service
+
+[Install]
+WantedBy=timers.target

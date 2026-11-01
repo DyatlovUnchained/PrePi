@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrepPi — Welcome</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="welcome-page">
+    <section class="welcome-card">
+        <p class="eyebrow">YOUR HOUSEHOLD READINESS DASHBOARD</p>
+        <pre class="temporary-logo"> ____                 ____  _
+|  _ \ _ __ ___ _ __ |  _ \(_)
+| |_) | '__/ _ \ '_ \| |_) | |
+|  __/| | |  __/ |_) |  __/| |
+|_|   |_|  \___| .__/|_|   |_|
+               |_|</pre>
+        <h1>Welcome to PrepPi</h1>
+        <p class="muted">Prepared, not panicked.</p>
+        <p>Let's configure your household requirements before you start tracking supplies.</p>
+        <a class="welcome-button" href="{{ url_for('setup') }}">Continue to setup →</a>
+    </section>
+</main>
+</body>
+</html>

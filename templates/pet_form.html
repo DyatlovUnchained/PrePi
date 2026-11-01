@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ 'Add pet' if mode == 'add' else 'Edit pet' }} · PrepPi</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .stock-form { max-width: 680px; margin: 28px auto; padding: 24px; }
+        .stock-form label { display: block; margin: 15px 0 6px; color: var(--muted); font-weight: 700; }
+        .stock-form input, .stock-form select { box-sizing: border-box; width: 100%; min-width: 0; }
+        .form-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+        .form-error { padding: 12px; border-radius: 8px; background: #48242d; color: #ffb9c2; }
+        .back-link { display: inline-block; margin-top: 18px; color: var(--text); }
+    </style>
+</head>
+<body>
+<header class="header">
+    <div class="brand">
+        <div class="logo"><img src="{{ url_for('static', filename='logo.png') }}" alt="PrepPi logo"></div>
+        <div>
+            <h1>PrepPi</h1>
+            <p class="subtitle">DOOMSDAY! · HOUSEHOLD PETS</p>
+        </div>
+    </div>
+    <div class="header-note">PREPARED, NOT PANICKED.</div>
+</header>
+
+<main>
+    <section class="panel stock-form">
+        <p class="eyebrow">PET MANAGEMENT</p>
+        <h2>{{ 'Add a pet' if mode == 'add' else 'Edit pet' }}</h2>
+        <p class="muted">
+            Record each animal's usual daily food allowance. PrepPi uses this
+            to calculate a 14-day pet-food preparedness target.
+        </p>
+
+        {% if error %}
+        <p class="form-error" role="alert">{{ error }}</p>
+        {% endif %}
+
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <label for="name">Pet name</label>
+            <input id="name" name="name" maxlength="100" required
+                   value="{{ values.get('name', '') }}">
+
+            <label for="species">Species</label>
+            <select id="species" name="species" required>
+                <option value="cat" {% if values.get('species', 'cat') == 'cat' %}selected{% endif %}>Cat</option>
+                <option value="dog" {% if values.get('species') == 'dog' %}selected{% endif %}>Dog</option>
+            </select>
+
+            <label for="daily_food_grams">Daily food allowance (grams)</label>
+            <input id="daily_food_grams" name="daily_food_grams"
+                   type="number" min="0.1" step="any" required
+                   value="{{ values.get('daily_food_grams', '') }}">
+            <p class="muted">Use the animal's normal daily food allowance, based on its current diet.</p>
+
+            <div class="form-actions">
+                <button type="submit">{{ 'Add pet' if mode == 'add' else 'Save changes' }}</button>
+                <a class="reset" href="{{ url_for('pets_page') }}">Cancel</a>
+            </div>
+        </form>
+        <a class="back-link" href="{{ url_for('pets_page') }}">← Back to pets</a>
+    </section>
+</main>
+</body>
+</html>

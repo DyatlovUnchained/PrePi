@@ -1,0 +1,29 @@
+[Unit]
+Description=PrepPi Household Preparedness Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=preppi
+Group=preppi
+WorkingDirectory=/opt/preppi
+
+Environment=PREPPI_DATA_DIR=/var/lib/preppi
+Environment=PREPPI_CONFIG_DIR=/etc/preppi
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/opt/preppi/venv/bin/python /opt/preppi/app.py
+
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/preppi /etc/preppi
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrepPi — Settings</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="header">
+    <div class="brand">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="PrepPi logo">
+        </div>
+        <div>
+            <h1>PrepPi</h1>
+            <p class="subtitle">HOUSEHOLD SETTINGS</p>
+        </div>
+    </div>
+    <div class="header-note">
+        <a class="settings-link" href="{{ url_for('dashboard') }}">← Dashboard</a>
+        <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="settings-link">Log out</button>
+        </form>
+    </div>
+</header>
+
+<main>
+    <section class="intro">
+        <div>
+            <p class="eyebrow">CONFIGURATION</p>
+            <h2>Make PrepPi yours.</h2>
+            <p class="muted">Adjust household requirements and expiry warnings for this installation.</p>
+        </div>
+    </section>
+
+    {% if saved and not error %}
+    <div class="settings-message success" role="status">
+        Settings saved successfully.
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="settings-message error" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <section class="panel settings-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">HOUSEHOLD</p>
+                <h2>Daily requirements</h2>
+            </div>
+        </div>
+
+        <form method="post" action="{{ url_for('settings_page') }}" class="settings-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="adults">Adults</label>
+            <input id="adults" name="adults" type="number"
+                   min="0" max="30" step="1" required
+                   value="{{ settings.adults }}">
+
+            <label for="children">Children</label>
+            <input id="children" name="children" type="number"
+                   min="0" max="30" step="1" required
+                   value="{{ settings.children }}">
+            <p class="field-help">Number of people your stored supplies need to support.</p>
+
+            <label for="daily_kcal_per_person">Daily calories per person (kcal)</label>
+            <input id="daily_kcal_per_person" name="daily_kcal_per_person" type="number"
+                   min="500" max="6000" step="100" required
+                   value="{{ settings.daily_kcal_per_person }}">
+            <p class="field-help">Used to estimate how many days of food energy your in-date stock represents.</p>
+
+            <label for="water_litres_per_person_per_day">Water per person per day (litres)</label>
+            <input id="water_litres_per_person_per_day" name="water_litres_per_person_per_day"
+                   type="number" min="0.5" max="20" step="0.5" required
+                   value="{{ settings.water_litres_per_person_per_day }}">
+            <p class="field-help">Planning allowance used to calculate the 14-day household water target.</p>
+
+            <div class="settings-divider"></div>
+
+            <div>
+                <p class="eyebrow">STOCK MANAGEMENT</p>
+                <h2>Expiry warnings</h2>
+            </div>
+
+            <label for="expiry_urgent_days">Urgent warning (days before expiry)</label>
+            <input id="expiry_urgent_days" name="expiry_urgent_days" type="number"
+                   min="1" max="3650" step="1" required
+                   value="{{ settings.expiry_urgent_days }}">
+            <p class="field-help">Items inside this window are marked urgent.</p>
+
+            <label for="expiry_warning_days">General warning (days before expiry)</label>
+            <input id="expiry_warning_days" name="expiry_warning_days" type="number"
+                   min="1" max="3650" step="1" required
+                   value="{{ settings.expiry_warning_days }}">
+            <p class="field-help">Items inside this window are marked as expiring soon, unless already urgent.</p>
+
+            <div class="settings-actions">
+                <button type="submit">Save settings</button>
+                <a class="secondary-link" href="{{ url_for('dashboard') }}">Cancel</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel settings-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">EMAIL REPORTS</p>
+                <h2>Optional email configuration</h2>
+            </div>
+        </div>
+
+        {% if email_status == "saved" %}
+        <div class="settings-message success" role="status">Email configuration saved.</div>
+        {% elif email_status == "disabled" %}
+        <div class="settings-message success" role="status">Email configuration disabled.</div>
+        {% endif %}
+
+        {% if email_error %}
+        <div class="settings-message error" role="alert">{{ email_error }}</div>
+        {% endif %}
+
+        <p class="muted">
+            {% if email_config.enabled %}
+            Email is configured for {{ email_config.address }}.
+            {% else %}
+            Email is not configured. You can continue using PrepPi without it.
+            {% endif %}
+        </p>
+
+        <form method="post" action="{{ url_for('save_email_settings') }}" class="settings-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="gmail_address">Gmail sender address</label>
+            <input id="gmail_address" name="gmail_address" type="email"
+                   autocomplete="username"
+                   value="{{ email_config.address }}" required>
+
+            <label for="gmail_app_password">Gmail app password</label>
+            <input id="gmail_app_password" name="gmail_app_password" type="password"
+                   autocomplete="new-password"
+                   placeholder="{% if email_config.has_password %}Saved — leave blank to keep{% else %}Enter Gmail app password{% endif %}">
+            <p class="field-help">Use a Google app password, not your normal Google account password.</p>
+
+            <label for="report_recipients">Report recipients</label>
+            <input id="report_recipients" name="report_recipients" type="text"
+                   value="{{ email_config.recipients }}"
+                   placeholder="you@example.com, partner@example.com" required>
+            <p class="field-help">Separate multiple addresses with commas.</p>
+
+            <label for="allowed_senders">Allowed senders for stock updates</label>
+            <input id="allowed_senders" name="allowed_senders" type="text"
+                   value="{{ email_config.allowed_senders }}"
+                   placeholder="you@example.com, partner@example.com">
+            <p class="field-help">
+                Only these addresses can send stock updates to PrepPi.
+                Leave blank to disable automatic stock imports.
+            </p>
+
+            <label class="checkbox-label">
+                <input type="checkbox" name="email_enabled"
+                       {% if email_config.enabled %}checked{% endif %}>
+                Enable email reports
+            </label>
+
+            {% if email_config.has_password %}
+            <label class="checkbox-label">
+                <input type="checkbox" name="keep_existing_password" checked>
+                Keep the saved app password if the password field is blank
+            </label>
+            {% endif %}
+
+            <div class="settings-actions">
+                <button type="submit">Save email settings</button>
+            </div>
+        </form>
+    </section>
+
+</main>
+</body>
+</html>

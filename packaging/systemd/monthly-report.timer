@@ -1,0 +1,10 @@
+[Unit]
+Description=Run PrepPi monthly preparedness report
+
+[Timer]
+OnCalendar=*-*-01 09:00:00
+Persistent=true
+Unit=preppi-monthly-report.service
+
+[Install]
+WantedBy=timers.target

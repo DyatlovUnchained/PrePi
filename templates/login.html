@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrepPi — Login</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="header">
+    <div class="brand">
+        <div class="logo"><img src="{{ url_for('static', filename='logo.png') }}" alt="PrepPi logo"></div>
+        <div><h1>PrepPi</h1><p class="subtitle">HOUSEHOLD DASHBOARD</p></div>
+    </div>
+</header>
+<main>
+    <section class="intro">
+        <div>
+            <p class="eyebrow">WELCOME BACK</p>
+            <h2>Log in to PrepPi.</h2>
+            <p class="muted">Enter your household password to continue.</p>
+        </div>
+    </section>
+    {% if error %}
+    <div class="settings-message error" role="alert">{{ error }}</div>
+    {% endif %}
+    <section class="panel settings-panel">
+        <form method="post" class="settings-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="password">Household password</label>
+            <input id="password" name="password" type="password"
+                   autocomplete="current-password" required>
+            <button type="submit">Log in</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

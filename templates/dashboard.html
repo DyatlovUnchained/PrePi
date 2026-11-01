@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrepPi</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="header">
+    <div class="brand">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='logo.png') }}"
+                 alt="PrepPi logo"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+            <span class="logo-placeholder">AT</span>
+        </div>
+        <div>
+            <h1>PrepPi</h1>
+            <p class="subtitle">DOOMSDAY! · HOUSEHOLD STOCK CONTROL</p>
+        </div>
+    </div>
+    <div class="header-note">
+        <a class="settings-link" href="{{ url_for('settings_page') }}">Settings ⚙</a>
+        <a class="settings-link" href="{{ url_for('equipment_page') }}">Equipment ⚒</a>
+        <a class="settings-link" href="{{ url_for('pets_page') }}">Pets 🐾</a>
+        <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="settings-link">Log out</button>
+        </form>
+        <span>PREPARED, NOT PANICKED.</span>
+    </div>
+</header>
+
+<main>
+    <section class="intro">
+        <div>
+            <p class="eyebrow">THE STORES</p>
+            <h2>Know what you've got.</h2>
+            <p class="muted">A live inventory of your household emergency supplies.</p>
+        </div>
+        <div class="date-card">
+            <span>Today</span>
+            <strong>{{ today }}</strong>
+        </div>
+    </section>
+
+    <section class="stats">
+        <article class="stat">
+            <span>Individual items</span>
+            <strong>{{ total }}</strong>
+            <small>Containers and bottles</small>
+        </article>
+        <article class="stat">
+            <span>Product types</span>
+            <strong>{{ types }}</strong>
+            <small>Distinct products</small>
+        </article>
+        <article class="stat">
+            <span>Expiry watch</span>
+            <strong>{{ items|selectattr('days_left', 'le', 30)|selectattr('days_left', 'ge', 0)|list|length }}</strong>
+            <small>Due within 30 days</small>
+        </article>
+        <article class="stat">
+            <span>Water endurance</span>
+            <strong>{{ "%.1f"|format(endurance.water_days) }} days</strong>
+            <small>{{ endurance.water_litres|round(1) }} litres in date; food and overall endurance not yet measurable</small>
+        </article>
+        <article class="stat food-stat">
+            <span>Food endurance</span>
+            <strong>{{ "%.1f"|format(food_endurance.food_days) }} days</strong>
+            <small>{{ "{:,}".format(food_endurance.food_kcal) }} estimated kcal in date</small>
+        </article>
+    </section>
+
+    <section class="panel food-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">CALORIE ESTIMATE</p>
+                <h2>Food endurance</h2>
+            </div>
+            <span class="count">Household target: {{ "{:,}".format(food_endurance.daily_target_kcal|int) }} kcal/day</span>
+        </div>
+        <div class="food-summary">
+            <div class="food-metric">
+                <span>Food energy recorded</span>
+                <strong>{{ "{:,}".format(food_endurance.food_kcal) }} kcal</strong>
+            </div>
+            <div class="food-metric">
+                <span>Estimated food supply</span>
+                <strong>{{ "%.2f"|format(food_endurance.food_days) }} days</strong>
+            </div>
+            <div class="food-metric">
+                <span>Product-data energy</span>
+                <strong>{{ "{:,}".format(food_endurance.product_kcal) }} kcal</strong>
+            </div>
+            <div class="food-metric">
+                <span>Category-estimated energy</span>
+                <strong>{{ "{:,}".format(food_endurance.estimated_kcal) }} kcal</strong>
+            </div>
+        </div>
+
+        {% if nutrition_status == "refreshed" %}
+        <p class="inline-notice" role="status">Nutrition lookup refreshed. Review the source labels below.</p>
+        {% elif nutrition_status == "refresh_failed" %}
+        <p class="inline-notice" role="alert">Nutrition refresh failed. The cached data and category estimates are still available.</p>
+        {% endif %}
+
+        <div class="table-wrap food-table-wrap">
+            <table class="food-table">
+                <thead>
+                    <tr><th>Food</th><th>Quantity</th><th>Estimated energy</th><th>Basis</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in food_endurance.breakdown %}
+                    <tr>
+                        <td>{{ row.item }}</td>
+                        <td>{{ row.quantity }}</td>
+                        <td>{{ "{:,}".format(row.kcal) }} kcal</td>
+                        <td>
+                            {% if row.source == "product data" %}
+                                Product data{% if row.matched_product %}: {{ row.matched_product }}{% endif %}
+                            {% else %}
+                                Category estimate
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="empty">No in-date food with a recognised pack size was found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if food_endurance.unmeasured_count %}
+        <p class="footnote">{{ food_endurance.unmeasured_count }} food record(s) could not be assigned a calorie value.</p>
+        {% endif %}
+
+        <p class="footnote">
+            This is an approximate energy calculation, not a guarantee of a nutritionally complete diet.
+            Expired food is excluded. Product data and category estimates are shown separately.
+            The overall endurance estimate is limited by whichever is lower: food or water.
+        </p>
+        <form method="post" action="{{ url_for('refresh_nutrition') }}"
+              onsubmit="return confirm('Refresh product nutrition data online? This may take several seconds.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">Refresh product nutrition data</button>
+        </form>
+    </section>
+
+
+    {% if pets %}
+    <section class="panel food-panel pet-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">PET PREPAREDNESS</p>
+                <h2>🐾 Looking after your pets</h2>
+            </div>
+            <span class="count">{{ pets|length }} registered</span>
+            <a class="stock-action" href="{{ url_for('pets_page') }}">Manage pets</a>
+        </div>
+
+        <div class="food-summary">
+            {% for pet in pets %}
+            <div class="food-metric">
+                <span>{{ pet.name }} · {{ pet.species|capitalize }}</span>
+                <strong>{{ pet.daily_food_grams|int }}g/day</strong>
+                <small>14-day requirement: {{ (pet.daily_food_grams * 14)|round|int }}g</small>
+            </div>
+            {% endfor %}
+            <div class="food-metric">
+                <span>Combined 14-day requirement</span>
+                <strong>{{ (pets|sum(attribute='daily_food_grams') * 14)|round|int }}g</strong>
+                <small>Based on recorded daily allowances</small>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">INVENTORY</p>
+                <h2>Your stockpile</h2>
+            </div>
+            <span class="count">{{ items|length }} shown</span>
+            <a class="stock-action" href="{{ url_for('add_stock_item') }}">+ Add stock</a>
+        </div>
+
+        <form class="filters" method="get" action="/">
+            <input type="search" name="q" placeholder="Search stock..."
+                   value="{{ search }}">
+            <select name="category">
+                <option value="">All categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>
+                    {{ cat }}
+                </option>
+                {% endfor %}
+            </select>
+            <button type="submit">Filter</button>
+            <a class="reset" href="/">Reset</a>
+        </form>
+
+        {% set stock_status = request.args.get('stock_status', '') %}
+        {% if stock_status %}
+        <p class="inline-notice" role="status">
+            {% if stock_status == 'added' %}Stock saved successfully.
+            {% elif stock_status == 'updated' %}Stock updated successfully.
+            {% elif stock_status == 'deleted' %}Stock batch removed.
+            {% elif stock_status == 'missing' %}That stock record was not found.
+            {% endif %}
+        </p>
+        {% endif %}
+        <div class="table-wrap inventory-table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                    {% for field, label in [
+                        ('item', 'Item'),
+                        ('category', 'Category'),
+                        ('subcategory', 'Sub-category'),
+                        ('expiry_date', 'Expiry date'),
+                        ('quantity', 'Qty'),
+                    ] %}
+                        <th>
+                            <a href="{{ url_for('dashboard', q=search, category=selected_category,
+                                sort=field,
+                                direction='desc' if sort == field and direction == 'asc' else 'asc') }}">
+                                {{ label }}
+                                {% if sort == field %}{{ '↑' if direction == 'asc' else '↓' }}{% endif %}
+                            </a>
+                        </th>
+                    {% endfor %}
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in items %}
+                    <tr>
+                        <td class="item-name">{{ item.item }}</td>
+                        <td>{{ item.category }}</td>
+                        <td>{{ item.subcategory }}</td>
+                        <td class="date-cell expiry-{{ item.status|lower|replace(' ', '-') }}">{{ item.expiry_display }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>
+                            <span class="status {{ item.status|lower|replace(' ', '-') }}">
+                                {{ item.status }}
+                            </span>
+                        </td>
+                        <td class="stock-actions">
+                            <a class="stock-action"
+                               href="{{ url_for('edit_stock_item', item_id=item.id, q=search, category=selected_category) }}">Edit</a>
+                            <form method="post"
+                                  action="{{ url_for('delete_stock_item', item_id=item.id) }}"
+                                  onsubmit="return confirm('Permanently remove this stock batch?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="stock-delete" type="submit">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7" class="empty">No items match your search.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="footnote">Expiry dates are inventory reminders. Always follow the product's storage instructions and date labelling.</p>
+    </section>
+
+
+
+
+
+
+
+    <section class="panel recommendations">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">NEXT STEPS</p>
+                <h2>Recommended supplies</h2>
+            </div>
+            <span class="count">Live assessment · 2 adults</span>
+        </div>
+        <div class="recommendation-grid">
+            {% for rec in recommendations %}
+            <article class="recommendation">
+                <div class="rec-icon">{{ rec.icon }}</div>
+                <h3>{{ rec.title }}</h3>
+                <p>{{ rec.description }}</p>
+                <div class="rec-status {{ rec.status_class }}">
+                    <span>Current stock assessment</span>
+                    <strong>{{ rec.status }}</strong>
+                </div>
+                <span class="rec-tag">{{ rec.tag }}</span>
+            </article>
+            {% endfor %}
+        </div>
+        <p class="footnote">Based on recorded inventory and background records. These are planning prompts, not an official preparedness assessment. Unrecorded supplies may still be available at home.</p>
+    </section>
+
+
+    <section class="panel report-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">MONTHLY SUMMARY</p>
+                <h2>Preparedness report</h2>
+            </div>
+        </div>
+        <p class="muted">
+            Email the current preparedness assessment and an Excel workbook
+            containing recorded owned stock and equipment.
+        </p>
+        {% if report_status == "sent" %}
+        <p role="status">Monthly report sent successfully.</p>
+        {% elif report_status == "failed" %}
+        <p role="alert">The monthly report could not be sent. Check the server log.</p>
+        {% elif report_status == "stock_sent" %}
+        <p role="status">On-demand stock report sent successfully.</p>
+        {% elif report_status == "stock_failed" %}
+        <p role="alert">The on-demand stock report could not be sent. Check the server log.</p>
+        {% endif %}
+        <form method="post" action="{{ url_for('send_monthly_report') }}"
+              onsubmit="return confirm('Send the monthly preparedness report and Excel inventory to the configured email recipients now?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">Send monthly report by email</button>
+        </form>
+        <p>
+            <a class="stock-action" href="{{ url_for('download_import_template') }}">
+                Download Excel stock import template
+            </a>
+        </p>
+
+    </section>
+
+    <footer>
+        <span>PREPPI – DOOMSDAY!</span>
+        <span>Small steps. Sensible preparation.</span>
+    </footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrepPi — First-run setup</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="header">
+    <div class="brand">
+        <div class="logo"><img src="{{ url_for('static', filename='logo.png') }}" alt="PrepPi logo"></div>
+        <div><h1>PrepPi</h1><p class="subtitle">FIRST-RUN SETUP</p></div>
+    </div>
+</header>
+<main>
+    <section class="intro">
+        <div>
+            <p class="eyebrow">LET'S GET STARTED</p>
+            <h2>Set up your household.</h2>
+            <p class="muted">You can change these choices later in Settings.</p>
+        </div>
+    </section>
+
+    {% if error %}
+    <div class="settings-message error" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <section class="panel settings-panel">
+        <form method="post" class="settings-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="adults">Adults</label>
+            <input id="adults" name="adults" type="number"
+                   min="0" max="30" step="1" required
+                   value="{{ settings.adults }}">
+
+            <label for="children">Children</label>
+            <input id="children" name="children" type="number"
+                   min="0" max="30" step="1" required
+                   value="{{ settings.children }}">
+
+            <label for="daily_kcal_per_person">Daily calories per person (kcal)</label>
+            <input id="daily_kcal_per_person" name="daily_kcal_per_person" type="number"
+                   min="500" max="6000" step="100" required
+                   value="{{ settings.daily_kcal_per_person }}">
+
+            <label for="water_litres_per_person_per_day">Water per person per day (litres)</label>
+            <input id="water_litres_per_person_per_day"
+                   name="water_litres_per_person_per_day" type="number"
+                   min="0.5" max="20" step="0.5" required
+                   value="{{ settings.water_litres_per_person_per_day }}">
+
+            <div class="settings-divider"></div>
+            <h2>Expiry warnings</h2>
+
+            <label for="expiry_urgent_days">Urgent warning (days before expiry)</label>
+            <input id="expiry_urgent_days" name="expiry_urgent_days" type="number"
+                   min="1" max="3650" required
+                   value="{{ settings.expiry_urgent_days }}">
+
+            <label for="expiry_warning_days">General warning (days before expiry)</label>
+            <input id="expiry_warning_days" name="expiry_warning_days" type="number"
+                   min="1" max="3650" required
+                   value="{{ settings.expiry_warning_days }}">
+
+            <div class="settings-divider"></div>
+            <h2>Optional email reports</h2>
+            <p class="muted">
+                Configure email reports now, or skip this and set them up later
+                in Settings.
+            </p>
+
+            <label>
+                <input type="checkbox" name="email_enabled" value="on">
+                Enable email reports
+            </label>
+
+            <label for="gmail_address">Sender Gmail address</label>
+            <input id="gmail_address" name="gmail_address" type="email"
+                   autocomplete="email" placeholder="youraccount@gmail.com">
+
+            <label for="gmail_app_password">Gmail app password</label>
+            <input id="gmail_app_password" name="gmail_app_password"
+                   type="password" autocomplete="new-password"
+                   placeholder="Google-generated app password">
+            <p class="muted">
+                Use a Google app password, not your normal Google password.
+                App passwords require 2-Step Verification.
+            </p>
+
+            <label for="report_recipients">Recipient email address(es)</label>
+            <input id="report_recipients" name="report_recipients"
+                   type="text" autocomplete="off"
+                   placeholder="you@example.com, partner@example.com">
+            <p class="muted">Separate multiple addresses with commas.</p>
+
+            <label for="allowed_senders">Allowed senders for stock updates</label>
+            <input id="allowed_senders" name="allowed_senders"
+                   type="text" autocomplete="off"
+                   placeholder="you@example.com, partner@example.com">
+            <p class="muted">
+                Only these addresses can send stock updates to PrepPi.
+                Leave blank to disable automatic stock imports.
+            </p>
+
+            <div class="settings-actions">
+                <button type="submit">Save and open dashboard</button>
+            </div>
+        </form>
+    </section>
+</main>
+</body>
+</html>

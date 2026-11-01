@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ 'Add stock' if mode == 'add' else 'Edit stock' }} · PrepPi</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .stock-form { max-width: 680px; margin: 28px auto; padding: 24px; }
+        .stock-form label { display: block; margin: 15px 0 6px; color: var(--muted); font-weight: 700; }
+        .stock-form input, .stock-form select { box-sizing: border-box; width: 100%; min-width: 0; }
+        .form-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+        .form-error { padding: 12px; border-radius: 8px; background: #48242d; color: #ffb9c2; }
+        .back-link { display: inline-block; margin-top: 18px; color: var(--text); }
+    </style>
+</head>
+<body>
+<header class="header">
+    <div class="brand">
+        <div class="logo"><img src="{{ url_for('static', filename='logo.png') }}" alt="PrepPi logo"></div>
+        <div>
+            <h1>PrepPi</h1>
+            <p class="subtitle">DOOMSDAY! · HOUSEHOLD STOCK CONTROL</p>
+        </div>
+    </div>
+    <div class="header-note">PREPARED, NOT PANICKED.</div>
+</header>
+
+<main>
+    <section class="panel stock-form">
+        <p class="eyebrow">INVENTORY MANAGEMENT</p>
+        <h2>{{ 'Add stock' if mode == 'add' else 'Edit stock batch' }}</h2>
+        <p class="muted">Expiry dates are tracked separately for each batch.</p>
+
+        {% if error %}
+        <p class="form-error" role="alert">{{ error }}</p>
+        {% endif %}
+
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="item">Item name</label>
+            <input id="item" name="item" maxlength="200" required
+                   value="{{ values.get('item', '') }}">
+
+            <label for="category">Category</label>
+            <input id="category" name="category" maxlength="100" required
+                   list="category-options" value="{{ values.get('category', '') }}">
+            <datalist id="category-options">
+                <option value="Food and Drink">
+                <option value="Medicine">
+                <option value="Equipment">
+                <option value="Hygiene">
+            </datalist>
+
+            <label for="subcategory">Sub-category</label>
+            <input id="subcategory" name="subcategory" maxlength="100" required
+                   value="{{ values.get('subcategory', '') }}">
+
+            <label for="expiry_date">Expiry date</label>
+            <input id="expiry_date" name="expiry_date" type="date" required
+                   value="{{ values.get('expiry_date', '') }}">
+
+            <label for="quantity">Quantity</label>
+            <input id="quantity" name="quantity" type="number" min="0" step="1" required
+                   value="{{ values.get('quantity', 1) }}">
+
+            <div class="form-actions">
+                <button type="submit">{{ 'Add stock' if mode == 'add' else 'Save changes' }}</button>
+                <a class="reset" href="{{ url_for('dashboard') }}">Cancel</a>
+            </div>
+        </form>
+        <a class="back-link" href="{{ url_for('dashboard') }}">← Back to dashboard</a>
+    </section>
+</main>
+</body>
+</html>
