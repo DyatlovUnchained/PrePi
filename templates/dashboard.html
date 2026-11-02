@@ -22,9 +22,9 @@
         </div>
     </div>
     <div class="header-note">
-        <a class="settings-link" href="{{ url_for('settings_page') }}">Settings ⚙</a>
-        <a class="settings-link" href="{{ url_for('equipment_page') }}">Equipment ⚒</a>
-        <a class="settings-link" href="{{ url_for('pets_page') }}">Pets 🐾</a>
+        <a class="settings-link settings-link-settings" href="{{ url_for('settings_page') }}">Settings ⚙</a>
+        <a class="settings-link settings-link-equipment" href="{{ url_for('equipment_page') }}">Equipment ⚒</a>
+        <a class="settings-link settings-link-pets" href="{{ url_for('pets_page') }}">Pets 🐾</a>
         <form method="post" action="{{ url_for('logout') }}" class="logout-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="settings-link">Log out</button>
@@ -327,11 +327,11 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit">Send monthly report by email</button>
         </form>
-        <p>
-            <a class="stock-action" href="{{ url_for('download_import_template') }}">
+        <div class="report-download">
+            <a class="stock-action stock-action-download" href="{{ url_for('download_import_template') }}">
                 Download Excel stock import template
             </a>
-        </p>
+        </div>
 
     </section>
 

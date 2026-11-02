@@ -110,6 +110,11 @@ if [[ ! -f "$SCRIPT_DIR/requirements.txt" ]]; then
     fail "requirements.txt is missing."
 fi
 
+if [[ ! -f "$SCRIPT_DIR/packaging/preppi-splash.sh" ||
+      ! -f "$SCRIPT_DIR/packaging/logo.ansi" ]]; then
+    fail "Installer splash files are missing."
+fi
+
 for unit in preppi.service email-receiver.service email-receiver.timer expiry-alerts.service expiry-alerts.timer monthly-report.service monthly-report.timer; do
     if [[ ! -f "$SCRIPT_DIR/packaging/systemd/$unit" ]]; then
         fail "Required systemd file is missing: $unit"
@@ -148,6 +153,9 @@ do
         fail "Systemd unit $unit already exists. Refusing to overwrite it."
     fi
 done
+
+# Display the installer welcome screen after all preflight checks.
+bash "$SCRIPT_DIR/packaging/preppi-splash.sh"
 
 echo
 echo "Choose how to initialise PrepPi:"

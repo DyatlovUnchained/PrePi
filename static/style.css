@@ -338,13 +338,24 @@ footer { display: flex; justify-content: space-between; gap: 15px; padding: 22px
     background: var(--panel);
     text-align: center;
 }
-.temporary-logo {
-    overflow-x: auto;
-    color: var(--teal);
-    font-size: clamp(9px, 2vw, 16px);
-    text-align: left;
-    display: inline-block;
-    max-width: 100%;
+.welcome-logo {
+    width: clamp(140px, 28vw, 210px);
+    aspect-ratio: 1;
+    box-sizing: border-box;
+    margin: 0 auto 22px;
+    padding: 4px;
+    border: 1px solid #ffffff;
+    border-radius: 12px;
+    background: #ffffff;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+}
+
+.welcome-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 .welcome-button {
     display: inline-block;
@@ -357,3 +368,94 @@ footer { display: flex; justify-content: space-between; gap: 15px; padding: 22px
     text-decoration: none;
 }
 .welcome-button:hover { filter: brightness(0.92); }
+
+
+/* Dashboard navigation and report download refinements */
+.header-note {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    max-width: 620px;
+}
+
+.header-note > span {
+    flex-basis: 100%;
+    text-align: right;
+}
+
+.header-note .settings-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 13px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--panel2);
+    font-size: 12px;
+    letter-spacing: 0;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.header-note .settings-link-settings {
+    color: var(--blue);
+    border-color: var(--blue);
+}
+
+.header-note .settings-link-equipment {
+    color: var(--purple);
+    border-color: var(--purple);
+}
+
+.header-note .settings-link-pets {
+    color: var(--teal);
+    border-color: var(--teal);
+}
+
+.header-note .settings-link:hover {
+    background: #263247;
+    text-decoration: none;
+}
+
+.header-note .logout-form {
+    margin: 0;
+}
+
+.header-note .logout-form button {
+    color: var(--muted);
+    background: transparent;
+    border-color: var(--line);
+    padding: 9px 11px;
+    font-size: 11px;
+}
+
+.report-download {
+    margin: 0 20px 20px;
+}
+
+.stock-action-download {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 12px;
+    background: var(--blue);
+    border: 1px solid var(--blue);
+    border-radius: 8px;
+    color: #0b0e14;
+    font-weight: 750;
+    text-decoration: none;
+}
+
+.stock-action-download:hover {
+    background: #8bbaff;
+    border-color: #8bbaff;
+}
+
+@media (max-width: 760px) {
+    .header-note {
+        display: none;
+    }
+}

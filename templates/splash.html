@@ -10,12 +10,9 @@
 <main class="welcome-page">
     <section class="welcome-card">
         <p class="eyebrow">YOUR HOUSEHOLD READINESS DASHBOARD</p>
-        <pre class="temporary-logo"> ____                 ____  _
-|  _ \ _ __ ___ _ __ |  _ \(_)
-| |_) | '__/ _ \ '_ \| |_) | |
-|  __/| | |  __/ |_) |  __/| |
-|_|   |_|  \___| .__/|_|   |_|
-               |_|</pre>
+        <div class="welcome-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="PrepPi logo">
+        </div>
         <h1>Welcome to PrepPi</h1>
         <p class="muted">Prepared, not panicked.</p>
         <p>Let's configure your household requirements before you start tracking supplies.</p>
