@@ -8,17 +8,30 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-TIMER = "preppi-email-receiver.timer"
-SERVICE = "preppi-email-receiver.service"
+JOBS = {
+    "receiver": {
+        "timer": "preppi-email-receiver.timer",
+        "service": "preppi-email-receiver.service",
+    },
+    "expiry": {
+        "timer": "preppi-expiry-alerts.timer",
+        "service": "preppi-expiry-alerts.service",
+    },
+    "monthly": {
+        "timer": "preppi-monthly-report.timer",
+        "service": "preppi-monthly-report.service",
+    },
+}
+
 LEDGER = Path("/var/lib/preppi/email/email_log.db")
 
 
-def systemctl(*args):
+def systemctl(*args, timeout=15):
     return subprocess.run(
         ["systemctl", *args],
         capture_output=True,
         text=True,
-        timeout=15,
+        timeout=timeout,
         check=False,
     )
 
@@ -27,82 +40,161 @@ def property_value(unit, name):
     result = systemctl("show", unit, f"--property={name}", "--value")
     if result.returncode != 0:
         return ""
-    return result.stdout.strip()
+    value = result.stdout.strip()
+    return "" if value in ("", "n/a", "unknown") else value
 
 
-def receiver_status():
-    enabled_result = systemctl("is-enabled", TIMER)
-    active_result = systemctl("is-active", TIMER)
+def job_status(job_id, definition):
+    timer = definition["timer"]
+    service = definition["service"]
+
+    enabled_result = systemctl("is-enabled", timer)
+    active_result = systemctl("is-active", timer)
 
     enabled = enabled_result.stdout.strip() == "enabled"
     active = active_result.stdout.strip() == "active"
 
-    last_check = property_value(SERVICE, "ExecMainStartTimestamp")
+    last_run = property_value(service, "ExecMainStartTimestamp")
+    result = property_value(service, "Result")
+    exit_status = property_value(service, "ExecMainStatus")
+    next_run = ""
 
-    # The receiver uses a monotonic OnUnitActiveSec timer.
-    next_check = ""
-    next_usec = property_value(TIMER, "NextElapseUSecMonotonic")
+    if job_id == "receiver":
+        next_usec = property_value(timer, "NextElapseUSecMonotonic")
+        if next_usec.isdigit():
+            remaining = max(
+                0,
+                int(next_usec) / 1_000_000 - time.monotonic(),
+            )
+            next_run = (
+                datetime.now() + timedelta(seconds=remaining)
+            ).astimezone().isoformat(timespec="minutes")
+    else:
+        next_run = property_value(timer, "NextElapseUSecRealtime")
 
-    if next_usec.isdigit():
-        remaining = max(0, int(next_usec) / 1_000_000 - time.monotonic())
-        next_check = (
-            datetime.now() + timedelta(seconds=remaining)
-        ).astimezone().isoformat(timespec="minutes")
-
-    last_result = ""
-    last_processed = ""
-
-    if LEDGER.exists():
-        try:
-            with sqlite3.connect(f"file:{LEDGER}?mode=ro", uri=True) as db:
-                row = db.execute("""
-                    SELECT status, processed_at
-                    FROM processed_emails
-                    ORDER BY processed_at DESC
-                    LIMIT 1
-                """).fetchone()
-
-            if row:
-                last_result, last_processed = row
-        except sqlite3.Error:
-            last_result = "unavailable"
-
-    return {
-        "available": True,
+    status = {
         "enabled": enabled,
         "active": active,
-        "last_check": last_check,
-        "next_check": next_check,
-        "last_result": last_result,
-        "last_processed": last_processed,
+        "last_run": last_run,
+        "next_run": next_run,
+        "result": result,
+        "exit_status": exit_status,
+    }
+
+    if job_id == "receiver":
+        status.update({
+            "last_check": last_run,
+            "next_check": next_run,
+            "last_result": "",
+            "last_processed": "",
+        })
+
+        if LEDGER.exists():
+            try:
+                with sqlite3.connect(
+                    f"file:{LEDGER}?mode=ro", uri=True
+                ) as db:
+                    row = db.execute("""
+                        SELECT status, processed_at
+                        FROM processed_emails
+                        ORDER BY processed_at DESC
+                        LIMIT 1
+                    """).fetchone()
+
+                if row:
+                    status["last_result"], status["last_processed"] = row
+            except sqlite3.Error:
+                status["last_result"] = "unavailable"
+
+    return status
+
+
+def all_status():
+    return {
+        "available": True,
+        "jobs": {
+            job_id: job_status(job_id, definition)
+            for job_id, definition in JOBS.items()
+        },
     }
 
 
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] not in {
-        "enable", "disable", "status"
-    }:
+    args = sys.argv[1:]
+
+    if args == ["status"]:
+        print(json.dumps(all_status()))
+        return 0
+
+    if len(args) != 2:
         print(json.dumps({"error": "Invalid action"}))
         return 2
 
-    action = sys.argv[1]
+    action, job_id = args
+
+    if action not in ("enable", "disable", "run", "preview"):
+        print(json.dumps({"error": "Invalid action"}))
+        return 2
+
+    if job_id not in JOBS:
+        print(json.dumps({"error": "Invalid job"}))
+        return 2
+
+    definition = JOBS[job_id]
+
+    if action == "preview":
+        preview_scripts = {
+            "expiry": "/opt/preppi/email/expiry_alerts.py",
+            "monthly": "/opt/preppi/email/monthly_report_sender.py",
+        }
+        if job_id not in preview_scripts:
+            print(json.dumps({"error": "Preview is not supported for this job"}))
+            return 2
+
+        result = subprocess.run(
+            [
+                "runuser", "-u", "preppi", "--", "env",
+                "PREPPI_DATA_DIR=/var/lib/preppi",
+                "PREPPI_CONFIG_DIR=/etc/preppi",
+                "/opt/preppi/venv/bin/python",
+                preview_scripts[job_id],
+            ],
+            cwd="/opt/preppi",
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+        output = (result.stdout or "") + (result.stderr or "")
+        print(json.dumps({
+            "available": result.returncode == 0,
+            "action": "preview",
+            "job": job_id,
+            "returncode": result.returncode,
+            "output": output[-12000:],
+        }))
+        return 0 if result.returncode == 0 else 1
 
     if action == "enable":
-        result = systemctl("enable", "--now", TIMER)
+        result = systemctl("enable", "--now", definition["timer"])
     elif action == "disable":
-        result = systemctl("disable", "--now", TIMER)
+        result = systemctl("disable", "--now", definition["timer"])
     else:
-        result = None
+        result = systemctl("start", definition["service"], timeout=180)
 
-    if result is not None and result.returncode != 0:
+    if result.returncode != 0:
         print(json.dumps({
             "error": result.stderr.strip() or "Systemd command failed"
         }))
         return 1
 
-    print(json.dumps(receiver_status()))
+    print(json.dumps(all_status()))
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(json.dumps({"error": str(exc)}))
+        sys.exit(1)

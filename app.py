@@ -455,35 +455,70 @@ def send_stock_report():
 
 
 
-def get_receiver_status():
-    """Read the independent inbox receiver status through its restricted helper."""
+def get_automation_status():
+    """Read the status of all PrepPi automation timers."""
+    empty_job = {
+        "enabled": False,
+        "active": False,
+        "last_run": "",
+        "next_run": "",
+        "result": "",
+        "exit_status": "",
+    }
     try:
         result = subprocess.run(
             ["sudo", str(RECEIVER_CONTROL), "status"],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=15,
             check=False,
         )
         if result.returncode != 0:
-            raise RuntimeError("Receiver status helper failed.")
+            raise RuntimeError("Automation status helper failed.")
 
         status = json.loads(result.stdout)
-        if not isinstance(status, dict) or not status.get("available"):
-            raise RuntimeError("Receiver status is unavailable.")
+        jobs = status.get("jobs") if isinstance(status, dict) else None
+        if not status.get("available") or not isinstance(jobs, dict):
+            raise RuntimeError("Automation status is unavailable.")
 
-        return status
+        receiver = jobs.get("receiver")
+        expiry = jobs.get("expiry")
+        monthly = jobs.get("monthly")
+        if not all(isinstance(job, dict) for job in (receiver, expiry, monthly)):
+            raise RuntimeError("Automation status is incomplete.")
 
-    except (OSError, subprocess.SubprocessError, ValueError, RuntimeError):
+        return {
+            "available": True,
+            "jobs": jobs,
+            "receiver": receiver,
+            "expiry": expiry,
+            "monthly": monthly,
+        }
+
+    except (OSError, subprocess.SubprocessError, ValueError, RuntimeError, AttributeError):
         return {
             "available": False,
-            "enabled": False,
-            "active": False,
-            "last_check": "",
-            "next_check": "",
-            "last_result": "",
-            "last_processed": "",
+            "jobs": {
+                "receiver": dict(empty_job),
+                "expiry": dict(empty_job),
+                "monthly": dict(empty_job),
+            },
+            "receiver": {
+                **empty_job,
+                "last_check": "",
+                "next_check": "",
+                "last_result": "",
+                "last_processed": "",
+            },
+            "expiry": dict(empty_job),
+            "monthly": dict(empty_job),
         }
+
+
+def get_receiver_status():
+    """Backward-compatible receiver status accessor."""
+    status = get_automation_status()
+    return {"available": status["available"], **status["receiver"]}
 
 
 @app.route("/settings", methods=["GET", "POST"])
@@ -559,8 +594,14 @@ def settings_page():
     email_status = request.args.get("email_status", "")
     email_error = request.args.get("email_error", "")
     email_config = read_email_config()
-    receiver = get_receiver_status()
-    receiver_message = request.args.get("receiver_status", "")
+    automation = get_automation_status()
+    receiver = {
+        "available": automation["available"],
+        **automation["receiver"],
+    }
+    expiry = automation["expiry"]
+    monthly = automation["monthly"]
+    automation_available = automation["available"]
 
     return render_template(
         "settings.html",
@@ -571,7 +612,9 @@ def settings_page():
         email_status=email_status,
         email_error=email_error,
         receiver=receiver,
-        receiver_message=receiver_message,
+        expiry=expiry,
+        monthly=monthly,
+        automation_available=automation_available,
     )
 
 
@@ -611,7 +654,7 @@ def control_email_receiver():
 
     try:
         result = subprocess.run(
-            ["sudo", str(RECEIVER_CONTROL), action],
+            ["sudo", str(RECEIVER_CONTROL), action, "receiver"],
             capture_output=True,
             text=True,
             timeout=20,
@@ -628,6 +671,71 @@ def control_email_receiver():
 
     except (OSError, subprocess.SubprocessError, ValueError, RuntimeError):
         return redirect(url_for("settings_page", receiver_status="error"))
+
+
+@app.route("/settings/automation", methods=["POST"])
+def control_automation():
+    """Control a fixed PrepPi automation job from Settings."""
+    job = request.form.get("job", "")
+    action = request.form.get("action", "")
+
+    if job not in {"receiver", "expiry", "monthly"}:
+        flash("Unknown automation task.", "error")
+        return redirect(url_for("settings_page"))
+
+    if action not in {"enable", "disable", "preview", "run"}:
+        flash("Unknown automation action.", "error")
+        return redirect(url_for("settings_page"))
+
+    if action in {"preview", "run"} and job == "receiver":
+        flash("Preview and manual sending are not available for the inbox receiver.", "error")
+        return redirect(url_for("settings_page"))
+
+    if action in {"enable", "run"} and job in {"expiry", "monthly"}:
+        if not read_email_config().get("enabled"):
+            flash("Configure and save email settings before enabling or sending scheduled reports.", "error")
+            return redirect(url_for("settings_page"))
+
+    try:
+        result = subprocess.run(
+            ["sudo", str(RECEIVER_CONTROL), action, job],
+            capture_output=True,
+            text=True,
+            timeout=190,
+            check=False,
+        )
+
+        try:
+            response = json.loads(result.stdout) if result.stdout.strip() else {}
+        except ValueError:
+            response = {}
+
+        if result.returncode != 0 or response.get("available") is False:
+            detail = response.get("error") or result.stderr.strip()
+            flash(
+                f"Could not {action} the {job} task."
+                + (f" {detail}" if detail else ""),
+                "error",
+            )
+        elif action == "preview":
+            output = response.get("output", "").strip()
+            flash(
+                "Preview completed. No email was sent."
+                + (f"\\n{output[-1200:]}" if output else ""),
+                "success",
+            )
+        elif action == "run":
+            flash(f"The {job} task completed. Check its report output and email inbox.", "success")
+        else:
+            flash(
+                f"{job.title()} task {action}d successfully.",
+                "success",
+            )
+
+    except (OSError, subprocess.SubprocessError) as exc:
+        flash(f"Automation control failed: {exc}", "error")
+
+    return redirect(url_for("settings_page"))
 
 
 def stock_form_values():

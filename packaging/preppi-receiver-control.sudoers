@@ -1,1 +1,13 @@
-preppi ALL=(root) NOPASSWD: /usr/local/sbin/preppi-receiver-control enable, /usr/local/sbin/preppi-receiver-control disable, /usr/local/sbin/preppi-receiver-control status
+preppi ALL=(root) NOPASSWD: \
+    /usr/local/sbin/preppi-receiver-control status, \
+    /usr/local/sbin/preppi-receiver-control enable receiver, \
+    /usr/local/sbin/preppi-receiver-control enable expiry, \
+    /usr/local/sbin/preppi-receiver-control enable monthly, \
+    /usr/local/sbin/preppi-receiver-control disable receiver, \
+    /usr/local/sbin/preppi-receiver-control disable expiry, \
+    /usr/local/sbin/preppi-receiver-control disable monthly, \
+    /usr/local/sbin/preppi-receiver-control run receiver, \
+    /usr/local/sbin/preppi-receiver-control run expiry, \
+    /usr/local/sbin/preppi-receiver-control run monthly, \
+    /usr/local/sbin/preppi-receiver-control preview expiry, \
+    /usr/local/sbin/preppi-receiver-control preview monthly
