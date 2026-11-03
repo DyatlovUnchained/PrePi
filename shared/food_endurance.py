@@ -21,7 +21,17 @@ CATEGORY_ESTIMATES = {
     "beans": (90, "category estimate"),
     "tinned fruit": (65, "category estimate"),
     "tinned tomatoes": (25, "category estimate"),
+    "staples": (350, "category estimate"),
+    "protein": (150, "category estimate"),
 }
+
+
+def _is_water(name, subcategory):
+    """Exclude water without accidentally excluding foods such as watermelon."""
+    return (
+        (subcategory or "").strip().lower() == "water"
+        or bool(re.search(r"\bwater\b", (name or "").lower()))
+    )
 
 USER_AGENT = "PrepPi-Household-Stock-Calculator/1.0 (personal project)"
 CACHE_DAYS = 30
@@ -158,7 +168,10 @@ def _cached_product(item_name, category, allow_lookup=False, pack_size_grams=Non
             if row["source"] == "category estimate":
                 return row["kcal_per_100g"], row["source"], None
             if row["source"] == "unmeasured":
-                return None, "unmeasured", None
+                # Re-evaluate old unmeasured entries against newer category
+                # estimates so improvements take effect without waiting 30 days.
+                if (category or "").strip().lower() not in CATEGORY_ESTIMATES:
+                    return None, "unmeasured", None
 
         result = _lookup_online(item_name, pack_size_grams) if allow_lookup else None
         if result:
@@ -198,7 +211,7 @@ def refresh_product_data(all_stock):
             if category not in ("food and drink", "food"):
                 continue
             name = (row["item"] or "").strip()
-            if not name or "water" in (name + " " + (row["subcategory"] or "")).lower():
+            if not name or _is_water(name, row["subcategory"]):
                 continue
             key = name.lower()
             pack_grams = _row_pack_grams(row)
@@ -252,7 +265,7 @@ def calculate_food_endurance(all_stock, daily_target_kcal=4000, today=None, allo
 
         name = row["item"] or ""
         quantity = max(0, row["quantity"] or 0)
-        if not quantity or "water" in (name + " " + (row["subcategory"] or "")).lower():
+        if not quantity or _is_water(name, row["subcategory"]):
             continue
 
         expiry_text = (row["expiry_date"] or "").strip()

@@ -18,6 +18,7 @@ if str(BASE_DIR) not in sys.path:
 from shared.endurance import calculate_endurance
 from shared.food_endurance import calculate_food_endurance
 from shared.recommendations import build_recommendations
+from settings import read_daily_kcal_target
 
 LOGO_CID = "stock-report-logo"
 
@@ -141,7 +142,7 @@ def build_workbook(stock, equipment, path, pets=None):
     wb.save(path)
 
 
-def build_html(stock, equipment, targets, shopping, today, pets=None):
+def build_html(stock, equipment, targets, shopping, today, pets=None, daily_target_kcal=4000):
     usable = usable_stock(stock, today)
     endurance = calculate_endurance(usable, targets, today=today)
     # Keep email recommendations focused; the dashboard retains its own
@@ -202,7 +203,10 @@ Estimated pet food endurance</div>
         else "Not measurable"
     )
 
-    food = calculate_food_endurance(usable, today=today, allow_lookup=False)
+    food = calculate_food_endurance(
+        usable, daily_target_kcal=daily_target_kcal,
+        today=today, allow_lookup=False
+    )
     food_days = food.get("food_days")
     food_days_text = (
         f"{food_days:.1f} days" if food_days is not None
@@ -333,7 +337,7 @@ Based on category estimates</div>
 {food['unmeasured_count']}.</p>
 <p>Food endurance is an estimate from recorded, in-date stock, not a meal
 plan. Category estimates may differ from the actual product. The household
-target is illustrative and can be adjusted in a future version.</p>
+calorie target is taken from PrepPi settings.</p>
 </section>
 {pet_html}\n{expiry_html}
 <section><h2>Preparedness recommendations</h2>
@@ -362,7 +366,15 @@ def main():
     html_path = out_dir / "monthly-preparedness-report.html"
     xlsx_path = out_dir / "monthly-owned-inventory.xlsx"
 
-    document = build_html(stock, equipment, targets, shopping, today, pets=pets)
+    with sqlite3.connect(
+        f"file:{Path(args.db).resolve()}?mode=ro", uri=True
+    ) as db:
+        daily_target_kcal = read_daily_kcal_target(db)
+
+    document = build_html(
+        stock, equipment, targets, shopping, today, pets=pets,
+        daily_target_kcal=daily_target_kcal,
+    )
     html_path.write_text(document, encoding="utf-8")
     build_workbook(stock, equipment, xlsx_path, pets=pets)
 

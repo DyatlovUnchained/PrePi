@@ -186,27 +186,56 @@ def build_recommendations(all_stock, equipment, targets, outstanding, pets=None)
             "title": "Lighting and power",
             "description": (
                 (
-                    "Torches are recorded as owned, but their quantity is unconfirmed. "
-                    if any("torch" in n for n in all_equipment_names)
-                    and not any("torch" in n for n in equipment_names)
-                    else "Torches are recorded in equipment. "
-                    if any("torch" in n for n in equipment_names)
-                    else "Torches are not recorded in equipment. "
+                    "Lighting equipment is recorded as owned, but its quantity is unconfirmed. "
+                    if any(
+                        any(term in n for term in (
+                            "torch", "flashlight", "lantern",
+                            "headtorch", "head torch",
+                        )) or re.search(r"\blights?\b", n)
+                        for n in all_equipment_names
+                    ) and not any(
+                        any(term in n for term in (
+                            "torch", "flashlight", "lantern",
+                            "headtorch", "head torch",
+                        )) or re.search(r"\blights?\b", n)
+                        for n in equipment_names
+                    )
+                    else "Lighting equipment is recorded. "
+                    if any(
+                        any(term in n for term in (
+                            "torch", "flashlight", "lantern",
+                            "headtorch", "head torch",
+                        )) or re.search(r"\blights?\b", n)
+                        for n in equipment_names
+                    )
+                    else "Lighting equipment is not recorded in equipment. "
                 )
                 + (
-                    "No battery items are recorded; check the type and size required by your torches."
+                    "No battery items are recorded; check the type and size required by your lights."
                     if not batteries
-                    else f"{batteries} battery items recorded; check that their type and charge suit your torches."
+                    else f"{batteries} battery items recorded; check that their type and charge suit your lights."
                 )
             ),
             "status": (
-                "CHECK TORCHES & BATTERIES"
-                if not batteries or not any("torch" in n for n in equipment_names)
+                "CHECK LIGHTING & BATTERIES"
+                if not batteries or not any(
+                    any(term in n for term in (
+                        "torch", "flashlight", "lantern",
+                        "headtorch", "head torch",
+                    )) or re.search(r"\blights?\b", n)
+                    for n in equipment_names
+                )
                 else "VERIFY BATTERIES"
             ),
             "status_class": (
                 "status-close"
-                if not batteries or not any("torch" in n for n in equipment_names)
+                if not batteries or not any(
+                    any(term in n for term in (
+                        "torch", "flashlight", "lantern",
+                        "headtorch", "head torch",
+                    )) or re.search(r"\blights?\b", n)
+                    for n in equipment_names
+                )
                 else "status-good"
             ),
             "tag": "OUTAGE ESSENTIAL",
@@ -357,7 +386,7 @@ def build_recommendations(all_stock, equipment, targets, outstanding, pets=None)
         "Carbohydrates and staples": ("rice", "pasta", "oat", "cracker", "grain"),
         "Protein and balanced meals": ("bean", "lentil", "fish", "protein"),
         "Cooking fuel": ("fuel", "canister", "gas"),
-        "Lighting and power": ("torch", "flashlight", "battery", "power bank"),
+        "Lighting and power": ("torch", "flashlight", "light", "lantern", "battery", "power bank"),
         "First aid": ("first aid", "bandage", "plaster"),
         "Hygiene and sanitation": ("hygiene", "soap", "toilet", "sanitation"),
     }

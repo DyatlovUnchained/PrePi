@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 APP_NAME="PrepPi"
-APP_VERSION="0.1.1"
+APP_VERSION="0.1.3"
 APP_DIR="/opt/preppi"
 DATA_DIR="/var/lib/preppi"
 CONFIG_DIR="/etc/preppi"
@@ -29,6 +29,8 @@ APP_DIR_CREATED=0
 SERVICE_ACCOUNT_CREATED=0
 SERVICE_STARTED=0
 SERVICE_ENABLED=0
+RECEIVER_HELPER_INSTALLED=0
+RECEIVER_SUDOERS_INSTALLED=0
 SYSTEMD_RELOADED=0
 INSTALLED_UNITS=()
 
@@ -74,6 +76,17 @@ rollback_on_error() {
         echo "[PrepPi] WARNING: Preserving systemd unit files because service shutdown was not confirmed."
     fi
 
+    if [[ "$service_stopped" -eq 1 ]]; then
+        if [[ "$RECEIVER_SUDOERS_INSTALLED" -eq 1 ]]; then
+            rm -f -- /etc/sudoers.d/preppi-receiver-control
+        fi
+        if [[ "$RECEIVER_HELPER_INSTALLED" -eq 1 ]]; then
+            rm -f -- /usr/local/sbin/preppi-receiver-control
+        fi
+    else
+        echo "[PrepPi] WARNING: Preserving receiver control files because service shutdown was not confirmed."
+    fi
+
     if [[ "$SYSTEMD_RELOADED" -eq 1 ]]; then
         systemctl daemon-reload
     fi
@@ -110,6 +123,15 @@ if [[ ! -f "$SCRIPT_DIR/requirements.txt" ]]; then
     fail "requirements.txt is missing."
 fi
 
+if [[ ! -f "$SCRIPT_DIR/packaging/preppi-receiver-control" ||
+      ! -f "$SCRIPT_DIR/packaging/preppi-receiver-control.sudoers" ]]; then
+    fail "Inbox receiver control files are missing."
+fi
+
+if ! command -v visudo >/dev/null 2>&1; then
+    fail "visudo is required to validate the inbox receiver sudoers rule."
+fi
+
 if [[ ! -f "$SCRIPT_DIR/packaging/preppi-splash.sh" ||
       ! -f "$SCRIPT_DIR/packaging/logo.ansi" ]]; then
     fail "Installer splash files are missing."
@@ -139,6 +161,15 @@ done
 if id "$SERVICE_USER" >/dev/null 2>&1; then
     fail "The $SERVICE_USER account already exists. Refusing to use an existing account."
 fi
+
+for path in \
+    /usr/local/sbin/preppi-receiver-control \
+    /etc/sudoers.d/preppi-receiver-control
+do
+    if [[ -e "$path" ]]; then
+        fail "$path already exists. This installer will not overwrite it."
+    fi
+done
 
 for unit in \
     preppi.service \
@@ -209,6 +240,18 @@ rm -rf "$APP_DIR/tests" "$APP_DIR/packaging"
 chown -R root:root "$APP_DIR"
 find "$APP_DIR" -type d -exec chmod 0755 {} \;
 find "$APP_DIR" -type f -exec chmod 0644 {} \;
+
+log "Installing inbox receiver control"
+RECEIVER_HELPER_INSTALLED=1
+install -o root -g root -m 0755 \
+    "$SCRIPT_DIR/packaging/preppi-receiver-control" \
+    /usr/local/sbin/preppi-receiver-control
+
+RECEIVER_SUDOERS_INSTALLED=1
+install -o root -g root -m 0440 \
+    "$SCRIPT_DIR/packaging/preppi-receiver-control.sudoers" \
+    /etc/sudoers.d/preppi-receiver-control
+visudo -cf /etc/sudoers.d/preppi-receiver-control
 
 log "Creating Python virtual environment"
 python3 -m venv "$APP_DIR/venv"

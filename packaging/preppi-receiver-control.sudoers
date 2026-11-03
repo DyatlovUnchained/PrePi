@@ -1,0 +1,1 @@
+preppi ALL=(root) NOPASSWD: /usr/local/sbin/preppi-receiver-control enable, /usr/local/sbin/preppi-receiver-control disable, /usr/local/sbin/preppi-receiver-control status

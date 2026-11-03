@@ -1,12 +1,12 @@
 import unittest
 
-from shared.food_endurance import _row_pack_grams
+from shared.food_endurance import _row_pack_grams, _is_water, CATEGORY_ESTIMATES
 
 
 class PackSizeTests(unittest.TestCase):
     def test_explicit_pack_size_takes_priority(self):
         row = {
-            "item": "Premium dog food",
+            "item": "Porridge oats",
             "unit_size_grams": 1200,
         }
         self.assertEqual(_row_pack_grams(row), 1200)
@@ -27,7 +27,7 @@ class PackSizeTests(unittest.TestCase):
 
     def test_explicit_size_overrides_name_weight(self):
         row = {
-            "item": "Dog food 400g",
+            "item": "Porridge oats 400g",
             "unit_size_grams": 800,
         }
         self.assertEqual(_row_pack_grams(row), 800)
@@ -41,7 +41,7 @@ class PackSizeTests(unittest.TestCase):
 
     def test_missing_size_and_name_weight_returns_none(self):
         row = {
-            "item": "Premium dog food",
+            "item": "Porridge oats",
             "unit_size_grams": None,
         }
         self.assertIsNone(_row_pack_grams(row))
@@ -70,7 +70,7 @@ class FoodEnduranceCalculationTests(unittest.TestCase):
         from unittest.mock import patch
         from shared.food_endurance import calculate_food_endurance
 
-        stock = [self.make_item("Premium dog food", 2, 1200)]
+        stock = [self.make_item("Porridge oats", 2, 1200)]
 
         with patch(
             "shared.food_endurance._cached_product",
@@ -103,7 +103,7 @@ class FoodEnduranceCalculationTests(unittest.TestCase):
         from unittest.mock import patch
         from shared.food_endurance import calculate_food_endurance
 
-        stock = [self.make_item("Premium dog food", 1, 1200)]
+        stock = [self.make_item("Porridge oats", 1, 1200)]
 
         with patch(
             "shared.food_endurance._cached_product",
@@ -116,6 +116,23 @@ class FoodEnduranceCalculationTests(unittest.TestCase):
         self.assertEqual(cached.call_args.kwargs["pack_size_grams"], 1200)
 
 
+
+
+class FoodCategoryEstimateTests(unittest.TestCase):
+    def test_staples_estimate(self):
+        self.assertEqual(CATEGORY_ESTIMATES["staples"][0], 350)
+
+    def test_protein_estimate(self):
+        self.assertEqual(CATEGORY_ESTIMATES["protein"][0], 150)
+
+    def test_water_is_excluded(self):
+        self.assertTrue(_is_water("Bottled water", "Other Food"))
+
+    def test_water_subcategory_is_excluded(self):
+        self.assertTrue(_is_water("Aqua Pura", "Water"))
+
+    def test_watermelon_is_not_excluded(self):
+        self.assertFalse(_is_water("Watermelon", "Other Food"))
 
 
 if __name__ == "__main__":

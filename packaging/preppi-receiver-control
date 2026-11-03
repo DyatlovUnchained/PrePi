@@ -1,0 +1,108 @@
+#!/usr/bin/python3
+
+import json
+import sqlite3
+import subprocess
+import sys
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+
+TIMER = "preppi-email-receiver.timer"
+SERVICE = "preppi-email-receiver.service"
+LEDGER = Path("/var/lib/preppi/email/email_log.db")
+
+
+def systemctl(*args):
+    return subprocess.run(
+        ["systemctl", *args],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+
+def property_value(unit, name):
+    result = systemctl("show", unit, f"--property={name}", "--value")
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
+def receiver_status():
+    enabled_result = systemctl("is-enabled", TIMER)
+    active_result = systemctl("is-active", TIMER)
+
+    enabled = enabled_result.stdout.strip() == "enabled"
+    active = active_result.stdout.strip() == "active"
+
+    last_check = property_value(SERVICE, "ExecMainStartTimestamp")
+
+    # The receiver uses a monotonic OnUnitActiveSec timer.
+    next_check = ""
+    next_usec = property_value(TIMER, "NextElapseUSecMonotonic")
+
+    if next_usec.isdigit():
+        remaining = max(0, int(next_usec) / 1_000_000 - time.monotonic())
+        next_check = (
+            datetime.now() + timedelta(seconds=remaining)
+        ).astimezone().isoformat(timespec="minutes")
+
+    last_result = ""
+    last_processed = ""
+
+    if LEDGER.exists():
+        try:
+            with sqlite3.connect(f"file:{LEDGER}?mode=ro", uri=True) as db:
+                row = db.execute("""
+                    SELECT status, processed_at
+                    FROM processed_emails
+                    ORDER BY processed_at DESC
+                    LIMIT 1
+                """).fetchone()
+
+            if row:
+                last_result, last_processed = row
+        except sqlite3.Error:
+            last_result = "unavailable"
+
+    return {
+        "available": True,
+        "enabled": enabled,
+        "active": active,
+        "last_check": last_check,
+        "next_check": next_check,
+        "last_result": last_result,
+        "last_processed": last_processed,
+    }
+
+
+def main():
+    if len(sys.argv) != 2 or sys.argv[1] not in {
+        "enable", "disable", "status"
+    }:
+        print(json.dumps({"error": "Invalid action"}))
+        return 2
+
+    action = sys.argv[1]
+
+    if action == "enable":
+        result = systemctl("enable", "--now", TIMER)
+    elif action == "disable":
+        result = systemctl("disable", "--now", TIMER)
+    else:
+        result = None
+
+    if result is not None and result.returncode != 0:
+        print(json.dumps({
+            "error": result.stderr.strip() or "Systemd command failed"
+        }))
+        return 1
+
+    print(json.dumps(receiver_status()))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

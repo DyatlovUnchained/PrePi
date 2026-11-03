@@ -2,6 +2,7 @@
 """Send an on-demand owned-stock and equipment report."""
 import argparse
 import smtplib
+import sqlite3
 import sys
 import tempfile
 from datetime import date
@@ -19,6 +20,7 @@ from shared.food_endurance import calculate_food_endurance
 from report_sender import load_report_config, make_message
 
 from paths import DB_PATH
+from settings import read_daily_kcal_target
 SUBJECT = "PrepPi — on-demand stock inventory"
 
 
@@ -32,10 +34,20 @@ def main():
     args = parser.parse_args()
 
     stock, equipment, targets, shopping, pets = read_inventory(DB_PATH)
+
+    db_uri = f"file:{Path(DB_PATH).resolve()}?mode=ro"
+    with sqlite3.connect(db_uri, uri=True) as db:
+        daily_target_kcal = read_daily_kcal_target(db)
+
     today = date.today()
     usable = usable_stock(stock, today)
     water = calculate_endurance(usable, targets, today=today)
-    food = calculate_food_endurance(usable, today=today, allow_lookup=False)
+    food = calculate_food_endurance(
+        usable,
+        daily_target_kcal=daily_target_kcal,
+        today=today,
+        allow_lookup=False,
+    )
 
     pet_html = ""
     if pets:

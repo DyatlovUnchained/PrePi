@@ -3,11 +3,7 @@ from datetime import date
 
 
 def calculate_endurance(all_stock, targets, today=None):
-    """
-    Estimate water endurance for two adults.
-    Food and overall endurance remain unmeasured until meal portions
-    are recorded in the inventory.
-    """
+    """Estimate water endurance from recorded stock and household targets."""
     today = today or date.today()
 
     water_target = targets.get("water", {})
@@ -57,6 +53,6 @@ def calculate_endurance(all_stock, targets, today=None):
         "water_days": water_days,
         "food_days": None,
         "overall_days": None,
-        "food_status": "Not yet measurable — meal portions are not recorded.",
-        "overall_status": "Not yet measurable — food endurance is unknown.",
+        "food_status": "Food endurance is calculated separately.",
+        "overall_status": "Overall endurance is calculated separately.",
     }

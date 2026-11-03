@@ -9,7 +9,7 @@
     <style>
         .stock-form { max-width: 680px; margin: 28px auto; padding: 24px; }
         .stock-form label { display: block; margin: 15px 0 6px; color: var(--muted); font-weight: 700; }
-        .stock-form input, .stock-form textarea { box-sizing: border-box; width: 100%; min-width: 0; }
+        .stock-form input, .stock-form select, .stock-form textarea { box-sizing: border-box; width: 100%; min-width: 0; }
         .stock-form textarea { min-height: 100px; padding: 12px; border-radius: 8px; }
         .form-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
         .form-error { padding: 12px; border-radius: 8px; background: #48242d; color: #ffb9c2; }
@@ -46,19 +46,18 @@
                    value="{{ values.get('item', '') }}">
 
             <label for="category">Category</label>
-            <input id="category" name="category" maxlength="100"
-                   list="equipment-category-options"
-                   value="{{ values.get('category', 'General') }}">
-            <datalist id="equipment-category-options">
-                <option value="Cooking">
-                <option value="Lighting">
-                <option value="Heating">
-                <option value="Power">
-                <option value="Tools">
-                <option value="Communications">
-                <option value="Camping">
-                <option value="General">
-            </datalist>
+            <select id="category" name="category" required>
+                <option value="" disabled
+                    {% if values.get('category', 'General') not in equipment_categories %}selected{% endif %}>
+                    Choose a category
+                </option>
+                {% for category in equipment_categories %}
+                <option value="{{ category }}"
+                    {% if values.get('category', 'General') == category %}selected{% endif %}>
+                    {{ category }}
+                </option>
+                {% endfor %}
+            </select>
 
             <label for="quantity">Quantity</label>
             <input id="quantity" name="quantity" type="number" min="0" step="1"

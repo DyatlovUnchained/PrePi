@@ -43,10 +43,26 @@ class RecommendationTests(unittest.TestCase):
             "Lighting and power",
             equipment=[equipment_item("Torches", None)],
         )
-        self.assertEqual(result["status"], "CHECK TORCHES & BATTERIES")
+        self.assertEqual(result["status"], "CHECK LIGHTING & BATTERIES")
 
 
 
+
+    def test_camping_light_counts_as_lighting_equipment(self):
+        result = recommendation(
+            "Lighting and power",
+            equipment=[equipment_item("Camping light", 1)],
+        )
+        self.assertIn("Lighting equipment is recorded", result["description"])
+        self.assertNotIn("not recorded in equipment", result["description"])
+        self.assertEqual(result["status"], "CHECK LIGHTING & BATTERIES")
+
+    def test_lantern_counts_as_lighting_equipment(self):
+        result = recommendation(
+            "Lighting and power",
+            equipment=[equipment_item("LED lantern", 1)],
+        )
+        self.assertIn("Lighting equipment is recorded", result["description"])
 
     def test_torches_owned_but_quantity_unknown_is_explained(self):
         result = recommendation(
@@ -58,7 +74,7 @@ class RecommendationTests(unittest.TestCase):
     def test_missing_torches_are_flagged(self):
         result = recommendation("Lighting and power")
         self.assertIn("not recorded in equipment", result["description"].lower())
-        self.assertEqual(result["status"], "CHECK TORCHES & BATTERIES")
+        self.assertEqual(result["status"], "CHECK LIGHTING & BATTERIES")
 
     def test_batteries_are_not_assumed_compatible(self):
         result = recommendation(
@@ -73,7 +89,7 @@ class RecommendationTests(unittest.TestCase):
             equipment=[equipment_item("Torches", 1)],
         )
         self.assertIn(
-            "check that their type and charge suit your torches",
+            "check that their type and charge suit your lights",
             result["description"].lower(),
         )
         self.assertEqual(result["status"], "VERIFY BATTERIES")

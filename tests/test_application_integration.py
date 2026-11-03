@@ -320,6 +320,87 @@ class ApplicationIntegrationTests(unittest.TestCase):
         self.assertEqual(record, ("Dog food", 3, None))
 
 
+    def test_equipment_form_shows_only_standard_categories(self):
+        response = self.client.get("/equipment/add")
+        self.assertEqual(response.status_code, 200)
+
+        html = response.get_data(as_text=True)
+        for category in (
+            "Cooking", "Lighting", "Heating", "Power",
+            "Tools", "Communications", "Camping", "General",
+        ):
+            self.assertIn(f'<option value="{category}"', html)
+
+        self.assertNotIn('<option value="Medicine"', html)
+        self.assertIn('<select id="category" name="category"', html)
+
+    def test_equipment_rejects_invalid_category(self):
+        response = self.client.post("/equipment/add", data={
+            "item": "Test medical kit",
+            "category": "Medicine",
+            "quantity": "1",
+            "notes": "",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "Please choose a valid equipment category",
+            response.get_data(as_text=True),
+        )
+
+        with preppi_app.get_db() as db:
+            count = db.execute(
+                "SELECT COUNT(*) FROM equipment WHERE item = ?",
+                ("Test medical kit",),
+            ).fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_equipment_can_be_added_and_edited_with_valid_categories(self):
+        response = self.client.post("/equipment/add", data={
+            "item": "Camping light",
+            "category": "Lighting",
+            "quantity": "1",
+            "notes": "LED light",
+        })
+        self.assertEqual(response.status_code, 302)
+
+        with preppi_app.get_db() as db:
+            record = db.execute(
+                "SELECT id, category FROM equipment WHERE item = ?",
+                ("Camping light",),
+            ).fetchone()
+
+        self.assertIsNotNone(record)
+        self.assertEqual(record["category"], "Lighting")
+
+        edit_response = self.client.get(
+            f"/equipment/{record['id']}/edit"
+        )
+        self.assertEqual(edit_response.status_code, 200)
+        edit_html = edit_response.get_data(as_text=True)
+        self.assertRegex(
+            edit_html,
+            r'<option value="Lighting"\s+selected>',
+        )
+
+        response = self.client.post(
+            f"/equipment/{record['id']}/edit",
+            data={
+                "item": "Camping light",
+                "category": "Camping",
+                "quantity": "1",
+                "notes": "LED light",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with preppi_app.get_db() as db:
+            updated = db.execute(
+                "SELECT category FROM equipment WHERE id = ?",
+                (record["id"],),
+            ).fetchone()
+        self.assertEqual(updated["category"], "Camping")
+
+
     def test_equipment_category_migration_preserves_existing_records(self):
         import sqlite3
 

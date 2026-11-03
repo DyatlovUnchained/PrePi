@@ -178,6 +178,90 @@
         </form>
     </section>
 
+
+    <section class="panel settings-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">INBOX RECEIVER</p>
+                <h2>Automatic stock updates</h2>
+            </div>
+        </div>
+
+        {% if receiver_message == "enable" %}
+        <div class="settings-message success" role="status">
+            Inbox receiver enabled.
+        </div>
+        {% elif receiver_message == "disable" %}
+        <div class="settings-message success" role="status">
+            Inbox receiver disabled.
+        </div>
+        {% elif receiver_message == "error" %}
+        <div class="settings-message error" role="alert">
+            Could not change the inbox receiver. Check the service configuration.
+        </div>
+        {% endif %}
+
+        <p class="muted">
+            This independently checks your inbox for authorised stock-update
+            emails every five minutes. It can be switched off without affecting
+            scheduled email reports.
+        </p>
+
+        {% if receiver.available %}
+        <div class="settings-form">
+            <p>
+                <strong>Status:</strong>
+                {% if receiver.enabled and receiver.active %}
+                    Enabled
+                {% elif receiver.enabled %}
+                    Enabled, but timer not currently active
+                {% else %}
+                    Disabled
+                {% endif %}
+            </p>
+            <p>
+                <strong>Last receiver check:</strong>
+                {{ receiver.last_check or "Not available" }}
+            </p>
+            <p>
+                <strong>Next scheduled check:</strong>
+                {{ receiver.next_check or "Not available" }}
+            </p>
+            <p>
+                <strong>Last processing result:</strong>
+                {% if receiver.last_result == "processed" %}
+                    Successfully processed
+                {% elif receiver.last_result %}
+                    {{ receiver.last_result | replace("_", " ") | title }}
+                {% else %}
+                    No emails processed yet
+                {% endif %}
+                {% if receiver.last_processed %}
+                    <span class="field-help">({{ receiver.last_processed }})</span>
+                {% endif %}
+            </p>
+
+            <form method="post" action="{{ url_for('control_email_receiver') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if receiver.enabled %}
+                <button type="submit" name="action" value="disable">
+                    Disable inbox receiver
+                </button>
+                {% else %}
+                <button type="submit" name="action" value="enable">
+                    Enable inbox receiver
+                </button>
+                {% endif %}
+            </form>
+        </div>
+        {% else %}
+        <div class="settings-message error" role="alert">
+            Receiver status is currently unavailable. The control helper may
+            not yet be installed.
+        </div>
+        {% endif %}
+    </section>
+
 </main>
 </body>
 </html>

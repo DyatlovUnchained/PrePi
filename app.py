@@ -10,6 +10,7 @@ from auth import (
     verify_household_password,
 )
 import sqlite3
+import json
 import re
 from pathlib import Path
 from datetime import date
@@ -25,6 +26,7 @@ from email_config import read_email_config, save_email_config
 from imports.template_builder import build_import_template
 
 BASE_DIR = Path(__file__).resolve().parent
+RECEIVER_CONTROL = Path("/usr/local/sbin/preppi-receiver-control")
 
 app = Flask(__name__)
 
@@ -453,6 +455,37 @@ def send_stock_report():
 
 
 
+def get_receiver_status():
+    """Read the independent inbox receiver status through its restricted helper."""
+    try:
+        result = subprocess.run(
+            ["sudo", str(RECEIVER_CONTROL), "status"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("Receiver status helper failed.")
+
+        status = json.loads(result.stdout)
+        if not isinstance(status, dict) or not status.get("available"):
+            raise RuntimeError("Receiver status is unavailable.")
+
+        return status
+
+    except (OSError, subprocess.SubprocessError, ValueError, RuntimeError):
+        return {
+            "available": False,
+            "enabled": False,
+            "active": False,
+            "last_check": "",
+            "next_check": "",
+            "last_result": "",
+            "last_processed": "",
+        }
+
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings_page():
     error = ""
@@ -526,6 +559,8 @@ def settings_page():
     email_status = request.args.get("email_status", "")
     email_error = request.args.get("email_error", "")
     email_config = read_email_config()
+    receiver = get_receiver_status()
+    receiver_message = request.args.get("receiver_status", "")
 
     return render_template(
         "settings.html",
@@ -535,6 +570,8 @@ def settings_page():
         email_config=email_config,
         email_status=email_status,
         email_error=email_error,
+        receiver=receiver,
+        receiver_message=receiver_message,
     )
 
 
@@ -563,6 +600,34 @@ def save_email_settings():
 
     except (ValueError, OSError) as exc:
         return redirect(url_for("settings_page", email_error=str(exc)))
+
+
+@app.route("/settings/receiver", methods=["POST"])
+def control_email_receiver():
+    """Enable or disable only the inbox receiver timer."""
+    action = request.form.get("action", "")
+    if action not in ("enable", "disable"):
+        return redirect(url_for("settings_page", receiver_status="error"))
+
+    try:
+        result = subprocess.run(
+            ["sudo", str(RECEIVER_CONTROL), action],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("Receiver control command failed.")
+
+        status = json.loads(result.stdout)
+        if not isinstance(status, dict) or not status.get("available"):
+            raise RuntimeError("Receiver status unavailable.")
+
+        return redirect(url_for("settings_page", receiver_status=action))
+
+    except (OSError, subprocess.SubprocessError, ValueError, RuntimeError):
+        return redirect(url_for("settings_page", receiver_status="error"))
 
 
 def stock_form_values():
@@ -704,10 +769,20 @@ def delete_stock_item(item_id):
     return redirect(url_for("dashboard", stock_status="deleted"))
 
 
+EQUIPMENT_CATEGORIES = (
+    "Cooking", "Lighting", "Heating", "Power",
+    "Tools", "Communications", "Camping", "General",
+)
+
+
 def equipment_form_values():
     """Validate fields submitted through the equipment forms."""
     item = request.form.get("item", "").strip()
-    category = request.form.get("category", "").strip() or "General"
+    submitted_category = request.form.get("category", "").strip() or "General"
+    category_lookup = {value.casefold(): value for value in EQUIPMENT_CATEGORIES}
+    category = category_lookup.get(submitted_category.casefold(), "")
+    if not category:
+        raise ValueError("Please choose a valid equipment category.")
     quantity_text = request.form.get("quantity", "").strip()
     notes = request.form.get("notes", "").strip()
 
@@ -759,6 +834,7 @@ def add_equipment():
         mode="add",
         values=values,
         error=error,
+        equipment_categories=EQUIPMENT_CATEGORIES,
     )
 
 
@@ -799,6 +875,7 @@ def edit_equipment(item_id):
         mode="edit",
         values=values,
         error=error,
+        equipment_categories=EQUIPMENT_CATEGORIES,
     )
 
 

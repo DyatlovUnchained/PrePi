@@ -45,6 +45,78 @@ class EmailSettingsRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Optional email configuration", response.data)
 
+    @patch("app.subprocess.run")
+    def test_settings_page_shows_receiver_status(self, mock_run):
+        mock_run.return_value = type("Result", (), {
+            "returncode": 0,
+            "stdout": (
+                '{"available": true, "enabled": true, "active": true, '
+                '"last_check": "2026-11-03 19:25", '
+                '"next_check": "2026-11-03T19:30", '
+                '"last_result": "processed", '
+                '"last_processed": "2026-11-03 19:20:00"}'
+            ),
+            "stderr": "",
+        })()
+
+        response = self.client.get("/settings")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"INBOX RECEIVER", response.data)
+        self.assertIn(b"Enabled", response.data)
+        self.assertIn(b"Successfully processed", response.data)
+
+    @patch("app.subprocess.run")
+    def test_enabling_receiver_calls_only_receiver_helper(self, mock_run):
+        mock_run.return_value = type("Result", (), {
+            "returncode": 0,
+            "stdout": '{"available": true, "enabled": true, "active": true}',
+            "stderr": "",
+        })()
+
+        response = self.client.post(
+            "/settings/receiver", data={"action": "enable"}
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("receiver_status=enable", response.location)
+        self.assertEqual(
+            mock_run.call_args.args[0],
+            ["sudo", str(preppi_app.RECEIVER_CONTROL), "enable"],
+        )
+        self.assertFalse(email_config.EMAIL_CONFIG.exists())
+
+    @patch("app.subprocess.run")
+    def test_disabling_receiver_does_not_change_email_configuration(
+        self, mock_run
+    ):
+        email_config.save_email_config(
+            "sender@gmail.com",
+            "abcdefghijklmnop",
+            "one@example.com",
+        )
+        before = email_config.read_email_config()
+
+        mock_run.return_value = type("Result", (), {
+            "returncode": 0,
+            "stdout": '{"available": true, "enabled": false, "active": false}',
+            "stderr": "",
+        })()
+
+        response = self.client.post(
+            "/settings/receiver", data={"action": "disable"}
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("receiver_status=disable", response.location)
+        self.assertEqual(
+            mock_run.call_args.args[0],
+            ["sudo", str(preppi_app.RECEIVER_CONTROL), "disable"],
+        )
+        after = email_config.read_email_config()
+        self.assertEqual(after, before)
+        self.assertTrue(after["enabled"])
+
     def test_saves_email_configuration(self):
         response = self.client.post(
             "/settings/email",
