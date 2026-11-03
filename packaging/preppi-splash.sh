@@ -52,7 +52,7 @@ else:
     print(" " * rule_offset + rule)
 
 centred("HOUSEHOLD PREPAREDNESS SYSTEM", BLUEGREY)
-centred("VERSION 0.1.4", GREEN)
+centred("VERSION 0.1.5", GREEN)
 
 if use_colour:
     print(" " * rule_offset + DIM + rule + RESET)

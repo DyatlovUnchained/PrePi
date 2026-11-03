@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 APP_NAME="PrepPi"
-APP_VERSION="0.1.4"
+APP_VERSION="0.1.5"
 APP_DIR="/opt/preppi"
 DATA_DIR="/var/lib/preppi"
 CONFIG_DIR="/etc/preppi"
