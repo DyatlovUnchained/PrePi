@@ -18,9 +18,8 @@ class StockImportReportTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.temp_dir.name) / "stock.db"
         self.original_nutrition_db = food_endurance.DB_PATH
-        food_endurance.DB_PATH = (
-            Path(self.temp_dir.name) / "nutrition-cache.db"
-        )
+        # Production stores inventory and nutrition cache in the same DB.
+        food_endurance.DB_PATH = self.db_path
 
         initialise_database(self.db_path)
         expiry = (date.today() + timedelta(days=365)).isoformat()
@@ -81,6 +80,37 @@ class StockImportReportTests(unittest.TestCase):
         self.assertIn("Test failure", document)
         self.assertEqual(context["changes"], [])
         self.assertEqual(context["food_endurance"]["food_kcal"], 1440)
+
+
+    def test_existing_transaction_is_reused_without_commit(self):
+        db = sqlite3.connect(self.db_path, timeout=1)
+        try:
+            db.execute("BEGIN IMMEDIATE")
+            document, context = build_report(
+                self.db_path, "success", "Stocked", connection=db
+            )
+
+            self.assertTrue(db.in_transaction)
+            self.assertEqual(context["food_endurance"]["food_kcal"], 1440)
+
+            cached = db.execute(
+                "SELECT source FROM food_nutrition_cache "
+                "WHERE product_key = 'baked beans'"
+            ).fetchone()
+            self.assertIsNotNone(cached)
+            self.assertEqual(cached[0], "category estimate")
+        finally:
+            db.rollback()
+            db.close()
+
+    def test_standalone_report_does_not_write_to_cache(self):
+        build_report(self.db_path, "success", "Stocked")
+
+        with sqlite3.connect(self.db_path) as db:
+            count = db.execute(
+                "SELECT COUNT(*) FROM food_nutrition_cache"
+            ).fetchone()[0]
+        self.assertEqual(count, 0)
 
 
 if __name__ == "__main__":

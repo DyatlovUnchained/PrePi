@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import app as preppi_app
+from shared import food_endurance
 import email_config
 from db_init import initialise_database
 
@@ -20,12 +21,15 @@ class SetupFlowTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory(prefix="preppi-test-")
         self.db_path = Path(self.temp_dir.name) / "stock.db"
         self.db_patch = patch.object(preppi_app, "DB_PATH", self.db_path)
+        self.food_db_patch = patch.object(food_endurance, "DB_PATH", self.db_path)
         self.db_patch.start()
+        self.food_db_patch.start()
         initialise_database(self.db_path)
         self.client = preppi_app.app.test_client()
 
     def tearDown(self):
         self.app_config_patch.stop()
+        self.food_db_patch.stop()
         self.db_patch.stop()
         self.temp_dir.cleanup()
 

@@ -21,9 +21,8 @@ class MonthlyReportPetTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.temp_dir.name) / "stock.db"
         self.original_nutrition_db = food_endurance.DB_PATH
-        food_endurance.DB_PATH = (
-            Path(self.temp_dir.name) / "nutrition-cache.db"
-        )
+        # Production stores inventory and nutrition cache in the same DB.
+        food_endurance.DB_PATH = self.db_path
         initialise_database(self.db_path)
         self.today = date.today()
         self.future = (self.today + timedelta(days=365)).isoformat()

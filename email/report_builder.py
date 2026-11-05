@@ -58,19 +58,20 @@ def build_report(db_path, outcome, action, changes=None, message_id=None,
             "SELECT item, category FROM shopping_list WHERE acquired = 0"
         ).fetchall()
         daily_target_kcal = read_daily_kcal_target(db)
+
+        today = date.today()
+        endurance = calculate_endurance(stock, targets, today=today)
+        food = calculate_food_endurance(
+            stock, daily_target_kcal=daily_target_kcal,
+            today=today, allow_lookup=False,
+            connection=db, cache_writes=not owns_connection,
+        )
+        recommendations = build_recommendations(
+            stock, equipment, targets, outstanding
+        )
     finally:
         if owns_connection:
             db.close()
-
-    today = date.today()
-    endurance = calculate_endurance(stock, targets, today=today)
-    food = calculate_food_endurance(
-        stock, daily_target_kcal=daily_target_kcal,
-        today=today, allow_lookup=False,
-    )
-    recommendations = build_recommendations(
-        stock, equipment, targets, outstanding
-    )
 
     status = "IMPORT SUCCESSFUL" if success else "IMPORT FAILED"
     status_colour = "#247447" if success else "#b42318"

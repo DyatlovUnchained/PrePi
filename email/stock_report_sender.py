@@ -47,6 +47,7 @@ def main():
         daily_target_kcal=daily_target_kcal,
         today=today,
         allow_lookup=False,
+        cache_writes=False,
     )
 
     pet_html = ""

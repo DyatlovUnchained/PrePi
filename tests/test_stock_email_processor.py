@@ -1,4 +1,5 @@
 import importlib.util
+import sqlite3
 import tempfile
 import unittest
 from datetime import date, timedelta
@@ -150,6 +151,36 @@ class StockEmailProcessorTests(unittest.TestCase):
 
         self.assertEqual(ledger["report_status"], "pending")
         self.assertIn("requires a pack size", ledger["import_error"])
+
+    def test_food_import_builds_report_cache_inside_import_database(self):
+        workbook = self.create_workbook(
+            "beans-import.xlsx",
+            [["Baked beans", "Food and Drink", "Beans",
+              (date.today() + timedelta(days=365)).isoformat(), 4, 400]],
+        )
+
+        result = processor.process_import(
+            self.db_path, "Stocked", workbook,
+            "<beans-import>", False, False,
+        )
+
+        self.assertEqual(result, 0)
+        with sqlite3.connect(self.db_path) as db:
+            item = db.execute(
+                "SELECT quantity FROM items WHERE item = 'Baked beans'"
+            ).fetchone()
+            cached = db.execute(
+                "SELECT source FROM food_nutrition_cache "
+                "WHERE product_key = 'baked beans'"
+            ).fetchone()
+            ledger = db.execute(
+                "SELECT report_status FROM email_imports "
+                "WHERE message_id = '<beans-import>'"
+            ).fetchone()
+
+        self.assertEqual(item[0], 4)
+        self.assertEqual(cached[0], "category estimate")
+        self.assertEqual(ledger[0], "pending")
 
     def test_duplicate_message_does_not_import_stock_twice(self):
         workbook = self.create_workbook(

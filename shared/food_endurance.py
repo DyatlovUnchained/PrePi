@@ -4,6 +4,7 @@ import json
 import re
 import sqlite3
 import time
+from datetime import date
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -37,18 +38,22 @@ USER_AGENT = "PrepPi-Household-Stock-Calculator/1.0 (personal project)"
 CACHE_DAYS = 30
 
 
-def _connect():
-    db = sqlite3.connect(DB_PATH, timeout=10)
+def _connect(read_only=False):
+    if read_only:
+        uri = Path(DB_PATH).resolve().as_uri() + "?mode=ro"
+        db = sqlite3.connect(uri, uri=True, timeout=10)
+    else:
+        db = sqlite3.connect(DB_PATH, timeout=10)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS food_nutrition_cache (
+                product_key TEXT PRIMARY KEY,
+                kcal_per_100g REAL,
+                source TEXT NOT NULL,
+                matched_product TEXT,
+                checked_at REAL NOT NULL
+            )
+        """)
     db.row_factory = sqlite3.Row
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS food_nutrition_cache (
-            product_key TEXT PRIMARY KEY,
-            kcal_per_100g REAL,
-            source TEXT NOT NULL,
-            matched_product TEXT,
-            checked_at REAL NOT NULL
-        )
-    """)
     return db
 
 
@@ -152,9 +157,21 @@ def _lookup_online(item_name, pack_size_grams=None):
     return best
 
 
-def _cached_product(item_name, category, allow_lookup=False, pack_size_grams=None):
+def _cached_product(item_name, category, allow_lookup=False,
+                    pack_size_grams=None, connection=None,
+                    cache_writes=True):
+    """Read cached nutrition, optionally using a caller-owned connection.
+
+    A supplied connection is never committed or closed here. When cache
+    writes are disabled, stale/missing entries use estimates without
+    modifying the database.
+    """
     now = time.time()
-    db = _connect()
+    owns_connection = connection is None
+    db = connection
+    if owns_connection:
+        db = _connect(read_only=not cache_writes)
+
     try:
         row = db.execute(
             "SELECT * FROM food_nutrition_cache WHERE product_key = ?",
@@ -164,12 +181,9 @@ def _cached_product(item_name, category, allow_lookup=False, pack_size_grams=Non
         if row and now - row["checked_at"] < CACHE_DAYS * 86400:
             if row["source"] == "product data":
                 return row["kcal_per_100g"], row["source"], row["matched_product"]
-            # Reuse a recent category fallback; don't repeatedly hit the API.
             if row["source"] == "category estimate":
                 return row["kcal_per_100g"], row["source"], None
             if row["source"] == "unmeasured":
-                # Re-evaluate old unmeasured entries against newer category
-                # estimates so improvements take effect without waiting 30 days.
                 if (category or "").strip().lower() not in CATEGORY_ESTIMATES:
                     return None, "unmeasured", None
 
@@ -183,20 +197,24 @@ def _cached_product(item_name, category, allow_lookup=False, pack_size_grams=Non
             )
             matched_name = None
 
-        db.execute("""
-            INSERT INTO food_nutrition_cache
-                (product_key, kcal_per_100g, source, matched_product, checked_at)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(product_key) DO UPDATE SET
-                kcal_per_100g = excluded.kcal_per_100g,
-                source = excluded.source,
-                matched_product = excluded.matched_product,
-                checked_at = excluded.checked_at
-        """, (item_name.lower(), kcal, source, matched_name, now))
-        db.commit()
+        if cache_writes:
+            db.execute("""
+                INSERT INTO food_nutrition_cache
+                    (product_key, kcal_per_100g, source, matched_product, checked_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(product_key) DO UPDATE SET
+                    kcal_per_100g = excluded.kcal_per_100g,
+                    source = excluded.source,
+                    matched_product = excluded.matched_product,
+                    checked_at = excluded.checked_at
+            """, (item_name.lower(), kcal, source, matched_name, now))
+            if owns_connection:
+                db.commit()
+
         return kcal, source, matched_name
     finally:
-        db.close()
+        if owns_connection:
+            db.close()
 
 
 def refresh_product_data(all_stock):
@@ -247,11 +265,40 @@ def refresh_product_data(all_stock):
         db.close()
 
 
-def calculate_food_endurance(all_stock, daily_target_kcal=4000, today=None, allow_lookup=False):
+def calculate_food_endurance(
+    all_stock, daily_target_kcal=4000, today=None, allow_lookup=False,
+    connection=None, cache_writes=True,
+):
     """Return estimated energy days and the breakdown of data quality."""
-    from datetime import date
-
     today = today or date.today()
+    total_kcal = 0.0
+    product_kcal = 0.0
+    estimated_kcal = 0.0
+    unmeasured_items = []
+    breakdown = []
+
+    owns_connection = connection is None
+    if owns_connection:
+        connection = _connect(read_only=not cache_writes)
+
+    try:
+        result = _calculate_food_endurance_rows(
+            all_stock, daily_target_kcal, today, allow_lookup,
+            connection, cache_writes,
+        )
+        if owns_connection and cache_writes:
+            connection.commit()
+        return result
+    finally:
+        if owns_connection:
+            connection.close()
+
+
+def _calculate_food_endurance_rows(
+    all_stock, daily_target_kcal, today, allow_lookup,
+    connection, cache_writes,
+):
+
     total_kcal = 0.0
     product_kcal = 0.0
     estimated_kcal = 0.0
@@ -288,6 +335,8 @@ def calculate_food_endurance(all_stock, daily_target_kcal=4000, today=None, allo
             row["subcategory"] or "",
             allow_lookup=allow_lookup,
             pack_size_grams=pack_grams,
+            connection=connection,
+            cache_writes=cache_writes,
         )
         if kcal_per_100g is None:
             unmeasured_items.append(name)

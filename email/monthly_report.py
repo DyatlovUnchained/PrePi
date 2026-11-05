@@ -205,7 +205,7 @@ Estimated pet food endurance</div>
 
     food = calculate_food_endurance(
         usable, daily_target_kcal=daily_target_kcal,
-        today=today, allow_lookup=False
+        today=today, allow_lookup=False, cache_writes=False
     )
     food_days = food.get("food_days")
     food_days_text = (

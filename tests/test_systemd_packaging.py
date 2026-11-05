@@ -29,6 +29,28 @@ class SystemdPackagingTests(unittest.TestCase):
             installer,
         )
 
+    def test_fresh_installer_enables_and_starts_all_scheduled_timers(self):
+        installer = (ROOT / "install.sh").read_text()
+
+        for timer in (
+            "preppi-email-receiver.timer",
+            "preppi-expiry-alerts.timer",
+            "preppi-monthly-report.timer",
+        ):
+            self.assertIn(timer, installer)
+
+        self.assertIn('systemctl enable --now "$timer"', installer)
+        self.assertIn('ENABLED_TIMERS+=("$timer")', installer)
+
+    def test_installer_rollback_disables_enabled_timers(self):
+        installer = (ROOT / "install.sh").read_text()
+
+        self.assertIn(
+            'for timer in "${ENABLED_TIMERS[@]}"; do',
+            installer,
+        )
+        self.assertIn('systemctl disable --now "$timer"', installer)
+
 
 if __name__ == "__main__":
     unittest.main()

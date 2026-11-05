@@ -44,6 +44,38 @@ def property_value(unit, name):
     return "" if value in ("", "n/a", "unknown") else value
 
 
+def next_receiver_check(timer):
+    """Return the next systemd timer activation as local ISO time."""
+    result = systemctl(
+        "list-timers", "--all", "--no-pager", "--output=json"
+    )
+
+    if result.returncode != 0:
+        return ""
+
+    try:
+        timers = json.loads(result.stdout)
+    except (json.JSONDecodeError, TypeError):
+        return ""
+
+    for entry in timers:
+        if entry.get("unit") != timer:
+            continue
+
+        next_usec = entry.get("next")
+        if type(next_usec) is not int or next_usec <= 0:
+            return ""
+
+        try:
+            return datetime.fromtimestamp(
+                next_usec / 1_000_000
+            ).astimezone().isoformat(timespec="minutes")
+        except (OverflowError, OSError, ValueError):
+            return ""
+
+    return ""
+
+
 def job_status(job_id, definition):
     timer = definition["timer"]
     service = definition["service"]
@@ -60,15 +92,7 @@ def job_status(job_id, definition):
     next_run = ""
 
     if job_id == "receiver":
-        next_usec = property_value(timer, "NextElapseUSecMonotonic")
-        if next_usec.isdigit():
-            remaining = max(
-                0,
-                int(next_usec) / 1_000_000 - time.monotonic(),
-            )
-            next_run = (
-                datetime.now() + timedelta(seconds=remaining)
-            ).astimezone().isoformat(timespec="minutes")
+        next_run = next_receiver_check(timer)
     else:
         next_run = property_value(timer, "NextElapseUSecRealtime")
 

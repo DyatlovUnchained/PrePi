@@ -1,4 +1,9 @@
 import unittest
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+import shared.food_endurance as food_endurance
 
 from shared.food_endurance import _row_pack_grams, _is_water, CATEGORY_ESTIMATES
 
@@ -55,6 +60,17 @@ class FoodEnduranceCalculationTests(unittest.TestCase):
     def setUp(self):
         from datetime import date
         self.today = date(2026, 10, 29)
+
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+
+        db_path_patch = patch.object(
+            food_endurance,
+            "DB_PATH",
+            Path(self.temp_dir.name) / "test-stock.db",
+        )
+        db_path_patch.start()
+        self.addCleanup(db_path_patch.stop)
 
     def make_item(self, name, quantity, pack_size):
         return {

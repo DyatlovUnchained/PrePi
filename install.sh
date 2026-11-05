@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 APP_NAME="PrepPi"
-APP_VERSION="0.1.5"
+APP_VERSION="0.1.6"
 APP_DIR="/opt/preppi"
 DATA_DIR="/var/lib/preppi"
 CONFIG_DIR="/etc/preppi"
@@ -33,6 +33,7 @@ RECEIVER_HELPER_INSTALLED=0
 RECEIVER_SUDOERS_INSTALLED=0
 SYSTEMD_RELOADED=0
 INSTALLED_UNITS=()
+ENABLED_TIMERS=()
 
 cleanup() {
     if [[ -n "${STAGING_DB:-}" && -f "$STAGING_DB" ]]; then
@@ -67,6 +68,10 @@ rollback_on_error() {
     if [[ "$SERVICE_ENABLED" -eq 1 ]]; then
         systemctl disable preppi.service
     fi
+
+    for timer in "${ENABLED_TIMERS[@]}"; do
+        systemctl disable --now "$timer"
+    done
 
     if [[ "$service_stopped" -eq 1 ]]; then
         for unit in "${INSTALLED_UNITS[@]}"; do
@@ -343,6 +348,15 @@ systemctl enable preppi.service
 SERVICE_STARTED=1
 systemctl start preppi.service
 systemctl is-active --quiet preppi.service
+
+for timer in \
+    preppi-email-receiver.timer \
+    preppi-expiry-alerts.timer \
+    preppi-monthly-report.timer
+do
+    ENABLED_TIMERS+=("$timer")
+    systemctl enable --now "$timer"
+done
 
 log "Installation complete"
 echo
